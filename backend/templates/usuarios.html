@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Usuarios</title>
+<link rel="stylesheet" href="/static/css/style.css">
+</head>
+
+<body>
+
+<div class="app-shell">
+
+<aside class="sidebar">
+
+    <div class="sidebar-logo">AngioPACS</div>
+    <div class="sidebar-subtitle">Usuarios</div>
+
+    <div class="nav-section">Principal</div>
+
+    <a class="nav-link" href="/">Procedimientos</a>
+
+    {% if request.session.get("rol") == "admin" %}
+    <a class="nav-link active" href="/usuarios">Usuarios</a>
+    {% endif %}
+
+    <div class="nav-section">Usuario</div>
+
+    <div class="sidebar-user">
+        <div class="sidebar-user-name">
+            {{ request.session.get("user", "sin usuario") }}
+        </div>
+
+        <div class="sidebar-user-role">
+            {{ request.session.get("rol", "") }}
+        </div>
+    </div>
+
+    <a class="nav-link" href="/logout">Cerrar sesión</a>
+
+</aside>
+
+<section class="main-panel">
+
+<header class="topbar">
+    <div class="brand">
+        <h1>Usuarios</h1>
+        <span>Administración del sistema</span>
+    </div>
+</header>
+
+<main class="container">
+
+<div class="card">
+    <h2 class="card-title">Nuevo usuario</h2>
+
+    <form method="post" action="/usuarios/nuevo">
+
+        <div class="two">
+            <div>
+                <label>Username</label>
+                <input name="username" required>
+            </div>
+
+            <div>
+                <label>Password</label>
+                <input name="password" type="password" required>
+            </div>
+        </div>
+
+        <div class="two">
+            <div>
+                <label>Nombre</label>
+                <input name="nombre">
+            </div>
+
+            <div>
+                <label>Mail</label>
+                <input name="mail">
+            </div>
+        </div>
+
+        <div class="two">
+            <div>
+                <label>País</label>
+                <input name="pais">
+            </div>
+
+            <div>
+                <label>Ciudad</label>
+                <input name="ciudad">
+            </div>
+        </div>
+
+        <div class="two">
+            <div>
+                <label>Edad</label>
+                <input name="edad">
+            </div>
+
+            <div>
+                <label>Especialidad</label>
+                <select name="especialidad">
+                    <option value="">--</option>
+                    <option>Radiologo</option>
+                    <option>Neurologo</option>
+                    <option>Neurocirujano</option>
+                </select>
+            </div>
+        </div>
+
+        <label>Rol</label>
+        <select name="rol">
+            <option value="comun">Común</option>
+            <option value="admin">Administrador</option>
+        </select>
+
+        <button type="submit">Crear usuario</button>
+
+    </form>
+</div>
+
+<div class="card">
+
+<h2 class="card-title">Usuarios registrados</h2>
+
+<table class="table">
+<thead>
+<tr>
+<th>ID</th>
+<th>Username</th>
+<th>Nombre</th>
+<th>Especialidad</th>
+<th>Rol</th>
+<th>Activo</th>
+<th>Acción</th>
+</tr>
+</thead>
+
+<tbody>
+{% for u in usuarios %}
+<tr>
+<td>{{ u.id }}</td>
+<td>{{ u.username }}</td>
+<td>{{ u.nombre }}</td>
+<td>{{ u.especialidad }}</td>
+<td>{{ u.rol }}</td>
+<td>{{ u.activo }}</td>
+<td>
+    <form method="post" action="/usuarios/{{ u.id }}/toggle-activo">
+        <button type="submit">
+            {% if u.activo == "si" %}
+                Desactivar
+            {% else %}
+                Activar
+            {% endif %}
+        </button>
+    </form>
+</td>
+</tr>
+{% endfor %}
+</tbody>
+
+</table>
+
+</div>
+
+</main>
+</section>
+</div>
+
+</body>
+</html>

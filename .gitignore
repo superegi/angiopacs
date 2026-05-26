@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Env
+.env
+
+# Data
+fotos_pacientes/
+orthanc-storage/
+postgres_data/
+
+# Docker
+*.log
+
+# Backup
+*.bak
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store

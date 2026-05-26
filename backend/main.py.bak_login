@@ -1,0 +1,49 @@
+from fastapi import FastAPI, Request, Depends
+from fastapi.templating import Jinja2Templates
+from sqlalchemy.orm import Session
+
+
+from fastapi.staticfiles import StaticFiles
+from pathlib import Path
+
+from routers.webhook import router as webhook_router
+from routers.pacientes import router as pacientes_router
+from database import engine, get_db
+from models import Base, Procedimiento
+
+Base.metadata.create_all(bind=engine)
+
+app = FastAPI(
+    title="AngioPACS",
+    description="Biblioteca procedural asistida por IA",
+    version="0.1.0"
+)
+
+BASE_DIR = Path(__file__).resolve().parent
+
+app.mount(
+    "/static",
+    StaticFiles(directory=BASE_DIR / "static"),
+    name="static"
+)
+
+
+templates = Jinja2Templates(directory="templates")
+
+app.include_router(webhook_router)
+app.include_router(pacientes_router)
+
+@app.get("/")
+def home(request: Request, db: Session = Depends(get_db)):
+    procedimientos = db.query(Procedimiento).order_by(Procedimiento.id.desc()).all()
+    return templates.TemplateResponse(
+    request=request,
+    name="procedimientos.html",
+    context={
+        "procedimientos": procedimientos
+    }
+    )
+
+@app.get("/health")
+def health_check():
+    return {"status": "online", "service": "AngioPACS"}

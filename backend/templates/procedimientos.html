@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>AngioPACS - Procedimientos</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+
+<div class="app-shell">
+
+    <aside class="sidebar">
+        <div class="sidebar-logo">AngioPACS</div>
+        <div class="sidebar-subtitle">Neurointervención · Registro clínico</div>
+
+        <div class="nav-section">Principal</div>
+        <a class="nav-link active" href="/">Procedimientos</a>
+
+        {% if request.session.get("rol") == "admin" %}
+        <a class="nav-link" href="/usuarios">Usuarios</a>
+        {% endif %}
+
+        <div class="nav-section">Análisis</div>
+        <a class="nav-link" href="#">Pacientes</a>
+        <a class="nav-link" href="#">Operadores</a>
+        <a class="nav-link" href="#">Materiales</a>
+        <a class="nav-link" href="#">Estadísticas</a>
+
+        <div class="nav-section">Usuario</div>
+        <div class="sidebar-user">
+            <div class="sidebar-user-name">{{ request.session.get("user", "sin usuario") }}</div>
+            <div class="sidebar-user-role">{{ request.session.get("rol", "") }}</div>
+        </div>
+
+        <a class="nav-link" href="/logout">Cerrar sesión</a>
+    </aside>
+
+    <section class="main-panel">
+        <header class="topbar">
+            <div class="brand">
+                <h1>Pacientes / Procedimientos</h1>
+                <span>Registro, búsqueda y revisión de casos</span>
+            </div>
+        </header>
+
+        <main class="container">
+
+            <section class="summary">
+                <div class="metric">
+                    <div class="number">{{ procedimientos|length }}</div>
+                    <div class="label">casos encontrados</div>
+                </div>
+            </section>
+
+            <section class="card">
+                <h2 class="card-title">Filtros</h2>
+
+                <form method="get" action="/" class="filters-grid">
+                    <div>
+                        <label>Desde</label>
+                        <input type="date" name="fecha_desde" value="{{ fecha_desde }}">
+                    </div>
+
+                    <div>
+                        <label>Hasta</label>
+                        <input type="date" name="fecha_hasta" value="{{ fecha_hasta }}">
+                    </div>
+
+                    <div>
+                        <label>Operador</label>
+                        <input name="operador" value="{{ operador }}" placeholder="Ej: Pérez">
+                    </div>
+
+                    <div>
+                        <label>Hospital / clínica</label>
+                        <input name="lugar" value="{{ lugar }}" placeholder="Ej: Hospital">
+                    </div>
+
+                    <div class="filters-wide">
+                        <label>Búsqueda general</label>
+                        <input name="buscar" value="{{ buscar }}" placeholder="Paciente, diagnóstico, procedimiento, HC">
+                    </div>
+
+                    <div class="filters-actions">
+                        <button type="submit">Buscar</button>
+                        <a class="btn btn-secondary" href="/">Limpiar</a>
+                    </div>
+                </form>
+            </section>
+
+            <section class="card">
+                <h2 class="card-title">Listado de casos</h2>
+
+                <div class="table-wrap">
+                    <table class="table clinical-table">
+                        <thead>
+                            <tr>
+                                <th>N caso</th>
+                                <th>Fecha procedimiento</th>
+                                <th>Paciente</th>
+                                <th>Hospital / clínica</th>
+                                <th>Operadores</th>
+                                <th>Procedimiento</th>
+                                <th>Diagnóstico</th>
+                                <th>Fotos</th>
+                                <th>Imágenes</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        {% for p in procedimientos %}
+                            <tr>
+                                <td>
+                                    <a href="/procedimientos/{{ p.id }}">#{{ p.id }}</a>
+                                </td>
+
+                                <td>
+                                    {% if p.fecha %}
+                                        {{ p.fecha }}
+                                    {% else %}
+                                        <span class="muted">Sin fecha</span>
+                                    {% endif %}
+                                </td>
+
+                                <td>
+                                    <a href="/procedimientos/{{ p.id }}">
+                                        {{ p.paciente_nombre or "Sin nombre" }}
+                                    </a>
+                                    {% if p.historia_clinica %}
+                                        <div class="small">HC: {{ p.historia_clinica }}</div>
+                                    {% endif %}
+                                </td>
+
+                                <td>{{ p.lugar or "" }}</td>
+
+                                <td>
+                                    {% if p.primer_operador %}
+                                        <div><span class="badge">1°</span> {{ p.primer_operador }}</div>
+                                    {% endif %}
+                                    {% if p.segundo_operador %}
+                                        <div><span class="badge">2°</span> {{ p.segundo_operador }}</div>
+                                    {% endif %}
+                                    {% if p.fellow %}
+                                        <div><span class="badge">Fellow</span> {{ p.fellow }}</div>
+                                    {% endif %}
+                                </td>
+
+                                <td>{{ p.procedimiento or "" }}</td>
+
+                                <td class="diagnosis-cell">{{ p.diagnostico or "" }}</td>
+
+                                <td>
+                                    <a class="badge badge-img" href="/procedimientos/{{ p.id }}">
+                                        Ver fotos
+                                    </a>
+                                </td>
+
+                                <td>
+                                    {% if p.dicom_orthanc_id or p.study_instance_uid %}
+                                        <a class="badge badge-img" href="/procedimientos/{{ p.id }}">
+                                            Explorador DICOM
+                                        </a>
+                                    {% else %}
+                                        <a class="badge" href="/procedimientos/{{ p.id }}">
+                                            Asociar DICOM
+                                        </a>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+        </main>
+    </section>
+
+</div>
+
+</body>
+</html>

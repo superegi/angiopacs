@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Procedimiento {{ procedimiento.id }}</title>
+<link rel="stylesheet" href="/static/css/style.css">
+</head>
+
+<body>
+
+<header class="topbar">
+    <div class="brand">
+        <h1>AngioPACS</h1>
+        <span>Detalle del procedimiento #{{ procedimiento.id }}</span>
+    </div>
+</header>
+
+<main class="container">
+
+<a class="btn btn-secondary" href="/">← Volver</a>
+
+<div class="card">
+    <h1>{{ procedimiento.paciente_nombre or "Sin nombre" }}</h1>
+    <p><b>ID:</b> {{ procedimiento.id }}</p>
+    <p><b>HC:</b> {{ procedimiento.historia_clinica or "" }}</p>
+</div>
+
+<div class="card">
+    <h2 class="card-title">Operadores frecuentes</h2>
+    <div class="operator-strip">
+        <span class="operator-chip">Operador 1</span>
+        <span class="operator-chip">Operador 2</span>
+        <span class="operator-chip">Fellow</span>
+        <span class="operator-chip">Anestesista</span>
+    </div>
+    <p class="small">Luego estos nombres saldrán desde la base de datos y servirán para autocompletar.</p>
+</div>
+
+<div class="card">
+    <h2 class="card-title">Editar caso</h2>
+
+    <form method="post" action="/procedimientos/{{ procedimiento.id }}/editar">
+
+        <div class="two">
+            <div>
+                <label>Lugar</label>
+                <input name="lugar" value="{{ procedimiento.lugar or '' }}">
+            </div>
+
+            <div>
+                <label>Historia clínica</label>
+                <input name="historia_clinica" value="{{ procedimiento.historia_clinica or '' }}">
+            </div>
+        </div>
+
+        <label>Nombre paciente</label>
+        <input name="paciente_nombre" value="{{ procedimiento.paciente_nombre or '' }}">
+
+        <div class="two">
+            <div>
+                <label>Edad</label>
+                <input name="edad" value="{{ procedimiento.edad or '' }}">
+            </div>
+
+            <div>
+                <label>Procedimiento</label>
+                <input name="procedimiento_txt" value="{{ procedimiento.procedimiento or '' }}">
+            </div>
+        </div>
+
+        <label>Diagnóstico</label>
+        <textarea name="diagnostico">{{ procedimiento.diagnostico or '' }}</textarea>
+
+        <label>Localización aneurisma</label>
+        <textarea name="localizacion_aneurisma">{{ procedimiento.localizacion_aneurisma or '' }}</textarea>
+
+        <div class="two">
+            <div>
+                <label>1er operador</label>
+                <input name="primer_operador" list="operadores" value="{{ procedimiento.primer_operador or '' }}">
+            </div>
+
+            <div>
+                <label>2do operador</label>
+                <input name="segundo_operador" list="operadores" value="{{ procedimiento.segundo_operador or '' }}">
+            </div>
+        </div>
+
+        <label>Fellow</label>
+        <input name="fellow" list="operadores" value="{{ procedimiento.fellow or '' }}">
+
+        <datalist id="operadores">
+            <option value="Operador 1">
+            <option value="Operador 2">
+            <option value="Fellow">
+            <option value="Anestesista">
+        </datalist>
+
+        <label>Presentación clínica</label>
+        <textarea name="presentacion_clinica">{{ procedimiento.presentacion_clinica or '' }}</textarea>
+
+        <h3>Materiales</h3>
+
+        <div class="two">
+            <div>
+                <label>Vaina</label>
+                <input name="vaina" value="{{ procedimiento.vaina or '' }}">
+            </div>
+
+            <div>
+                <label>Catéter</label>
+                <input name="cateter" value="{{ procedimiento.cateter or '' }}">
+            </div>
+        </div>
+
+        <div class="two">
+            <div>
+                <label>Catéter intermedio</label>
+                <input name="cateter_intermedio" value="{{ procedimiento.cateter_intermedio or '' }}">
+            </div>
+
+            <div>
+                <label>Microcatéter</label>
+                <input name="microcateter" value="{{ procedimiento.microcateter or '' }}">
+            </div>
+        </div>
+
+        <div class="two">
+            <div>
+                <label>Guía</label>
+                <input name="guia" value="{{ procedimiento.guia or '' }}">
+            </div>
+
+            <div>
+                <label>Microguía</label>
+                <input name="microguia" value="{{ procedimiento.microguia or '' }}">
+            </div>
+        </div>
+
+        <label>Flow diverter / Stent / Dispositivo</label>
+        <input name="fd" value="{{ procedimiento.fd or '' }}">
+
+        <label>Materiales usados</label>
+        <textarea name="materiales_usados">{{ procedimiento.materiales_usados or '' }}</textarea>
+
+        <label>Complicaciones</label>
+        <textarea name="complicaciones">{{ procedimiento.complicaciones or '' }}</textarea>
+
+        <label>Notas adicionales</label>
+        <textarea name="notas_adicionales">{{ procedimiento.notas_adicionales or '' }}</textarea>
+
+        <button type="submit">Guardar cambios</button>
+
+    </form>
+</div>
+
+<div class="card">
+    <h2 class="card-title">Subir archivo a este caso</h2>
+
+    <form method="post" action="/procedimientos/{{ procedimiento.id }}/subir-archivo" enctype="multipart/form-data">
+        <input type="file" name="archivo">
+        <button type="submit">Subir</button>
+    </form>
+</div>
+
+<h2 style="color:#f7f3e8;">Archivos asociados</h2>
+
+<div class="grid">
+{% for archivo in archivos %}
+<div class="card">
+    {% if archivo.tipo == "foto" %}
+        <a href="/archivos/{{ archivo.id }}" target="_blank">
+            <img src="/archivos/{{ archivo.id }}">
+        </a>
+    {% elif archivo.tipo == "video" %}
+        <video controls>
+            <source src="/archivos/{{ archivo.id }}">
+        </video>
+    {% elif archivo.tipo == "zip" %}
+    <div class="dicom-card">
+        <div class="dicom-icon">ZIP</div>
+        <p><b>Archivo ZIP original</b></p>
+        <a class="btn" href="/archivos/{{ archivo.id }}" target="_blank">Descargar ZIP</a>
+    </div>
+    
+    {% else %}
+        <a class="btn" href="/archivos/{{ archivo.id }}" target="_blank">Abrir archivo</a>
+    {% endif %}
+
+    <p><b>Archivo ID:</b> {{ archivo.id }}</p>
+<p class="small">
+    Tipo: {{ archivo.tipo }} | Origen: {{ archivo.origen }}
+</p>
+<p class="small">
+    {{ archivo.nombre_original or "" }}
+</p>
+<p class="small">
+    {{ archivo.creado_en }}
+</p>
+</div>
+{% endfor %}
+</div>
+
+</main>
+
+</body>
+</html>

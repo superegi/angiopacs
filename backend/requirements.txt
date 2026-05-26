@@ -1,0 +1,12 @@
+fastapi
+uvicorn[standard]
+requests
+httpx
+python-telegram-bot
+sqlalchemy
+psycopg2-binary
+pillow
+python-multipart
+jinja2
+itsdangerous
+passlib[bcrypt]

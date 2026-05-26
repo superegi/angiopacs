@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Login - AngioPACS</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="login-body">
+
+<div class="login-shell">
+    <div class="login-card">
+        <div class="login-brand">AngioPACS</div>
+        <div class="login-subtitle">Registro neurointervencional</div>
+
+        {% if error %}
+            <div class="login-error">{{ error }}</div>
+        {% endif %}
+
+        <form method="post" action="/login">
+            <label>Usuario</label>
+            <input name="username" autocomplete="username" required>
+
+            <label>Contraseña</label>
+            <input name="password" type="password" autocomplete="current-password" required>
+
+            <button type="submit" class="login-button">Entrar</button>
+        </form>
+
+        <p class="small">Acceso privado · AngioPACS</p>
+    </div>
+</div>
+
+</body>
+</html>
