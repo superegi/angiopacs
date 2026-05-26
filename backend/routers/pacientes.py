@@ -7,6 +7,8 @@ import shutil
 import uuid
 import os
 import zipfile
+from services.orthanc_service import subir_dicom_a_orthanc
+
 
 
 from database import get_db
@@ -41,12 +43,35 @@ def ver_procedimiento(
         .all()
     )
 
+    otros_archivos = []
+    dicom_grupos = {}
+
+    for archivo in archivos:
+        if archivo.tipo == "dicom":
+            clave = archivo.orthanc_study_id or archivo.study_instance_uid or "sin_estudio"
+
+            if clave not in dicom_grupos:
+                dicom_grupos[clave] = {
+                    "clave": clave,
+                    "orthanc_study_id": archivo.orthanc_study_id,
+                    "study_instance_uid": archivo.study_instance_uid,
+                    "archivos": [],
+                }
+
+            dicom_grupos[clave]["archivos"].append(archivo)
+        else:
+            otros_archivos.append(archivo)
+
+    dicom_grupos = list(dicom_grupos.values())
+
+
     return templates.TemplateResponse(
         request=request,
         name="procedimiento_detalle.html",
         context={
             "procedimiento": procedimiento,
-            "archivos": archivos,
+            "archivos": otros_archivos,
+            "dicom_grupos": dicom_grupos,
         }
     )
 
@@ -156,6 +181,21 @@ async def subir_archivo_procedimiento(
         estado="asociado",
     )
 
+    if tipo == "dicom":
+        try:
+            info_orthanc = subir_dicom_a_orthanc(str(ruta))
+            nuevo.orthanc_instance_id = info_orthanc.get("orthanc_instance_id")
+            nuevo.orthanc_study_id = info_orthanc.get("orthanc_study_id")
+            nuevo.study_instance_uid = info_orthanc.get("study_instance_uid")
+
+            if nuevo.orthanc_study_id:
+                p.dicom_orthanc_id = nuevo.orthanc_study_id
+            if nuevo.study_instance_uid:
+                p.study_instance_uid = nuevo.study_instance_uid
+
+        except Exception as e:
+            nuevo.estado = f"error_orthanc: {str(e)[:120]}"
+
     db.add(nuevo)
     db.commit()
 
@@ -184,15 +224,33 @@ async def subir_archivo_procedimiento(
                         tipo_extraido = "pdf"
 
                     nuevo_extraido = Archivo(
-                        procedimiento_id=procedimiento_id,
-                        tipo=tipo_extraido,
-                        origen="zip",
-                        ruta=str(archivo_extraido),
-                        nombre_original=archivo_extraido.name,
-                        estado="asociado",
+                    procedimiento_id=procedimiento_id,
+                    tipo=tipo_extraido,
+                    origen="zip",
+                    ruta=str(archivo_extraido),
+                    nombre_original=archivo_extraido.name,
+                    estado="asociado",
                     )
 
+                    if tipo_extraido == "dicom":
+                        try:
+                            info_orthanc = subir_dicom_a_orthanc(str(archivo_extraido))
+
+                            nuevo_extraido.orthanc_instance_id = info_orthanc.get("orthanc_instance_id")
+                            nuevo_extraido.orthanc_study_id = info_orthanc.get("orthanc_study_id")
+                            nuevo_extraido.study_instance_uid = info_orthanc.get("study_instance_uid")
+
+                            if nuevo_extraido.orthanc_study_id:
+                                p.dicom_orthanc_id = nuevo_extraido.orthanc_study_id
+
+                            if nuevo_extraido.study_instance_uid:
+                                p.study_instance_uid = nuevo_extraido.study_instance_uid
+
+                        except Exception as e:
+                            nuevo_extraido.estado = f"error_orthanc: {str(e)[:120]}"
+
                     db.add(nuevo_extraido)
+
 
             db.commit()
 

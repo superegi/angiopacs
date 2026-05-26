@@ -71,6 +71,16 @@ class Archivo(Base):
     telegram_file_id = Column(Text, nullable=True)
     telegram_chat_id = Column(String(100), nullable=True)
     nombre_original = Column(Text, nullable=True)
+    orthanc_instance_id = Column(String(100), nullable=True)
+    orthanc_study_id = Column(String(100), nullable=True)
+    study_instance_uid = Column(String(255), nullable=True)
+    orthanc_instance_id = Column(String(100), nullable=True)
+    orthanc_study_id = Column(String(100), nullable=True)
+    study_instance_uid = Column(String(255), nullable=True)
+
+    orthanc_instance_id = Column(String(100), nullable=True)
+    orthanc_study_id = Column(String(100), nullable=True)
+    study_instance_uid = Column(String(255), nullable=True)
 
     texto_extraido = Column(Text, nullable=True)
     paciente_sugerido = Column(String(255), nullable=True)

@@ -163,6 +163,31 @@
     </form>
 </div>
 
+<h2 style="color:#f7f3e8;">Estudios DICOM</h2>
+
+<div class="grid">
+{% for grupo in dicom_grupos %}
+<div class="card">
+    <div class="dicom-card">
+        <div class="dicom-icon">DICOM</div>
+
+        <p><b>Estudio DICOM</b></p>
+        <p class="small">{{ grupo.archivos|length }} imágenes / instancias</p>
+
+        {% if grupo.study_instance_uid %}
+            <a class="btn"
+               href="http://localhost:8042/stone-webviewer/index.html?study={{ grupo.study_instance_uid }}"
+               target="_blank">
+                Abrir visor
+            </a>
+        {% else %}
+            <p class="small">Estudio aún no vinculado a Orthanc</p>
+        {% endif %}
+    </div>
+</div>
+{% endfor %}
+</div>
+
 <h2 style="color:#f7f3e8;">Archivos asociados</h2>
 
 <div class="grid">
@@ -182,7 +207,7 @@
         <p><b>Archivo ZIP original</b></p>
         <a class="btn" href="/archivos/{{ archivo.id }}" target="_blank">Descargar ZIP</a>
     </div>
-    
+
     {% else %}
         <a class="btn" href="/archivos/{{ archivo.id }}" target="_blank">Abrir archivo</a>
     {% endif %}
