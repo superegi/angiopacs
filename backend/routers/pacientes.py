@@ -14,6 +14,8 @@ from services.orthanc_service import subir_dicom_a_orthanc
 from database import get_db
 from models import Procedimiento, Archivo
 
+ORTHANC_PUBLIC_URL = os.getenv("ORTHANC_PUBLIC_URL", "http://localhost:8042")
+
 router = APIRouter()
 templates = Jinja2Templates(directory="templates")
 
@@ -72,6 +74,8 @@ def ver_procedimiento(
             "procedimiento": procedimiento,
             "archivos": otros_archivos,
             "dicom_grupos": dicom_grupos,
+            "orthanc_public_url": ORTHANC_PUBLIC_URL,
+
         }
     )
 

@@ -176,7 +176,7 @@
 
         {% if grupo.study_instance_uid %}
             <a class="btn"
-               href="http://localhost:8042/stone-webviewer/index.html?study={{ grupo.study_instance_uid }}"
+               href="{{ orthanc_public_url }}/stone-webviewer/index.html?study={{ grupo.study_instance_uid }}"
                target="_blank">
                 Abrir visor
             </a>
