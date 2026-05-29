@@ -94,6 +94,68 @@ def ver_repositorios(
     )
 
 
+
+@router.post("/repositorios/{tag_id}/renombrar")
+def renombrar_tag_repositorio(
+    tag_id: int,
+    nombre: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    tag = db.query(RepositorioTag).filter(RepositorioTag.id == tag_id).first()
+
+    if not tag:
+        raise HTTPException(status_code=404, detail="Tag no encontrado")
+
+    nombre_limpio = nombre.strip()
+
+    if nombre_limpio:
+        tag.nombre = nombre_limpio
+        db.commit()
+
+    return RedirectResponse(
+        url="/repositorios",
+        status_code=303
+    )
+
+
+@router.post("/repositorios/{tag_id}/desactivar")
+def desactivar_tag_repositorio(
+    tag_id: int,
+    db: Session = Depends(get_db)
+):
+    tag = db.query(RepositorioTag).filter(RepositorioTag.id == tag_id).first()
+
+    if not tag:
+        raise HTTPException(status_code=404, detail="Tag no encontrado")
+
+    tag.activo = False
+    db.commit()
+
+    return RedirectResponse(
+        url="/repositorios",
+        status_code=303
+    )
+
+
+@router.post("/repositorios/{tag_id}/activar")
+def activar_tag_repositorio(
+    tag_id: int,
+    db: Session = Depends(get_db)
+):
+    tag = db.query(RepositorioTag).filter(RepositorioTag.id == tag_id).first()
+
+    if not tag:
+        raise HTTPException(status_code=404, detail="Tag no encontrado")
+
+    tag.activo = True
+    db.commit()
+
+    return RedirectResponse(
+        url="/repositorios",
+        status_code=303
+    )
+
+
 @router.get("/procedimientos")
 def listar_procedimientos(db: Session = Depends(get_db)):
     return db.query(Procedimiento).order_by(Procedimiento.id.desc()).all()

@@ -670,3 +670,52 @@ video {
   opacity: .45;
   text-decoration: line-through;
 }
+
+/* ANGIO-006: limpieza basica de repositorios */
+.repo-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.repo-item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--card-2);
+}
+
+.repo-form {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.repo-form input {
+  margin-bottom: 0;
+}
+
+.repo-disabled {
+  opacity: .55;
+}
+
+.btn-danger {
+  background: var(--red);
+}
+
+.btn-danger:hover {
+  background: #9d231b;
+}
+
+@media (max-width: 760px) {
+  .repo-item,
+  .repo-form {
+    grid-template-columns: 1fr;
+  }
+}

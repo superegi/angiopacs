@@ -31,11 +31,24 @@
     <div class="card">
         <h2 class="card-title">{{ tipo }}</h2>
 
-        <div class="tag-cloud">
+        <div class="repo-list">
             {% for item in items %}
-                <span class="tag-chip {% if not item.activo %}tag-disabled{% endif %}">
-                    {{ item.nombre }}
-                </span>
+                <div class="repo-item {% if not item.activo %}repo-disabled{% endif %}">
+                    <form method="post" action="/repositorios/{{ item.id }}/renombrar" class="repo-form">
+                        <input name="nombre" value="{{ item.nombre }}">
+                        <button type="submit">Renombrar</button>
+                    </form>
+
+                    {% if item.activo %}
+                    <form method="post" action="/repositorios/{{ item.id }}/desactivar">
+                        <button type="submit" class="btn-danger">Desactivar</button>
+                    </form>
+                    {% else %}
+                    <form method="post" action="/repositorios/{{ item.id }}/activar">
+                        <button type="submit">Activar</button>
+                    </form>
+                    {% endif %}
+                </div>
             {% endfor %}
         </div>
     </div>
