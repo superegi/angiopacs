@@ -61,6 +61,33 @@
     {% else %}
         <p class="small">Aún no hay participantes estructurados.</p>
     {% endif %}
+    <form method="post" action="/procedimientos/{{ procedimiento.id }}/participantes/agregar" class="inline-form">
+        <div class="three">
+            <div>
+                <label>Nombre</label>
+                <input name="nombre" list="personas_procedimiento" placeholder="Dr / integrante" required>
+                <datalist id="personas_procedimiento">
+                    {% for item in sugerencias_personas %}
+                    <option value="{{ item }}">
+                    {% endfor %}
+                </datalist>
+            </div>
+            <div>
+                <label>Rol</label>
+                <input name="rol" list="roles_procedimiento" placeholder="Ej: primer_operador" required>
+                <datalist id="roles_procedimiento">
+                    {% for item in sugerencias_roles %}
+                    <option value="{{ item }}">
+                    {% endfor %}
+                </datalist>
+            </div>
+            <div>
+                <label>Notas</label>
+                <input name="notas" placeholder="Opcional">
+            </div>
+        </div>
+        <button type="submit">Agregar participante</button>
+    </form>
 </div>
 
 <div class="card">
@@ -90,6 +117,37 @@
     {% else %}
         <p class="small">Aún no hay materiales estructurados.</p>
     {% endif %}
+    <form method="post" action="/procedimientos/{{ procedimiento.id }}/materiales/agregar" class="inline-form">
+        <div class="four">
+            <div>
+                <label>Nombre</label>
+                <input name="nombre" list="materiales_usados_sugeridos" placeholder="Nombre del material" required>
+                <datalist id="materiales_usados_sugeridos">
+                    {% for item in sugerencias_materiales %}
+                    <option value="{{ item }}">
+                    {% endfor %}
+                </datalist>
+            </div>
+            <div>
+                <label>Tipo</label>
+                <input name="tipo_material" list="tipos_material" placeholder="Ej: cateter_intermedio">
+                <datalist id="tipos_material">
+                    {% for item in sugerencias_tipos_material %}
+                    <option value="{{ item }}">
+                    {% endfor %}
+                </datalist>
+            </div>
+            <div>
+                <label>Cantidad</label>
+                <input name="cantidad" value="1">
+            </div>
+            <div>
+                <label>Notas</label>
+                <input name="notas" placeholder="Opcional">
+            </div>
+        </div>
+        <button type="submit">Agregar material</button>
+    </form>
 </div>
 
 <div class="card">

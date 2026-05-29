@@ -620,3 +620,29 @@ video {
     padding: 8px 10px;
   }
 }
+
+/* ANGIO-004: formularios estructurados */
+.inline-form {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.three {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr 1.2fr;
+  gap: 14px;
+}
+
+.four {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr .6fr 1.2fr;
+  gap: 14px;
+}
+
+@media (max-width: 900px) {
+  .three,
+  .four {
+    grid-template-columns: 1fr;
+  }
+}

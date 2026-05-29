@@ -12,7 +12,7 @@ from services.orthanc_service import subir_dicom_a_orthanc
 
 
 from database import get_db
-from models import Procedimiento, Archivo, ParticipanteProcedimiento, MaterialProcedimiento, EstudioDICOM, SugerenciaIA
+from models import Procedimiento, Archivo, ParticipanteProcedimiento, MaterialProcedimiento, EstudioDICOM, SugerenciaIA, RepositorioTag
 
 ORTHANC_PUBLIC_URL = os.getenv("ORTHANC_PUBLIC_URL", "http://localhost:8042")
 
@@ -20,6 +20,50 @@ router = APIRouter()
 templates = Jinja2Templates(directory="templates")
 
 DATA_PATH = os.getenv("DATA_PATH", "/app/data")
+
+def asegurar_tag(db: Session, tipo: str, nombre: str | None):
+    if not nombre:
+        return None
+
+    nombre_limpio = nombre.strip()
+    if not nombre_limpio:
+        return None
+
+    existente = (
+        db.query(RepositorioTag)
+        .filter(
+            RepositorioTag.tipo == tipo,
+            RepositorioTag.nombre == nombre_limpio,
+        )
+        .first()
+    )
+
+    if existente:
+        return existente
+
+    tag = RepositorioTag(
+        tipo=tipo,
+        nombre=nombre_limpio,
+        activo=True,
+    )
+    db.add(tag)
+    db.commit()
+    db.refresh(tag)
+    return tag
+
+
+def listar_nombres_tag(db: Session, tipo: str):
+    tags = (
+        db.query(RepositorioTag)
+        .filter(
+            RepositorioTag.tipo == tipo,
+            RepositorioTag.activo == True,
+        )
+        .order_by(RepositorioTag.nombre.asc())
+        .all()
+    )
+    return [t.nombre for t in tags]
+
 
 
 @router.get("/procedimientos")
@@ -97,6 +141,11 @@ def ver_procedimiento(
         .all()
     )
 
+    sugerencias_personas = listar_nombres_tag(db, "persona")
+    sugerencias_roles = listar_nombres_tag(db, "rol_procedimiento")
+    sugerencias_materiales = listar_nombres_tag(db, "material")
+    sugerencias_tipos_material = listar_nombres_tag(db, "tipo_material")
+
     return templates.TemplateResponse(
         request=request,
         name="procedimiento_detalle.html",
@@ -108,9 +157,81 @@ def ver_procedimiento(
             "participantes": participantes,
             "materiales": materiales,
             "sugerencias_ia": sugerencias_ia,
+            "sugerencias_personas": sugerencias_personas,
+            "sugerencias_roles": sugerencias_roles,
+            "sugerencias_materiales": sugerencias_materiales,
+            "sugerencias_tipos_material": sugerencias_tipos_material,
             "orthanc_public_url": ORTHANC_PUBLIC_URL,
 
         }
+    )
+
+
+@router.post("/procedimientos/{procedimiento_id}/participantes/agregar")
+async def agregar_participante_procedimiento(
+    procedimiento_id: int,
+    nombre: str = Form(...),
+    rol: str = Form(...),
+    notas: str = Form(None),
+    db: Session = Depends(get_db)
+):
+    procedimiento = db.query(Procedimiento).filter(Procedimiento.id == procedimiento_id).first()
+
+    if not procedimiento:
+        raise HTTPException(status_code=404, detail="Procedimiento no encontrado")
+
+    participante = ParticipanteProcedimiento(
+        procedimiento_id=procedimiento_id,
+        nombre=nombre,
+        rol=rol,
+        notas=notas,
+    )
+
+    db.add(participante)
+    db.commit()
+
+    asegurar_tag(db, "persona", nombre)
+    asegurar_tag(db, "rol_procedimiento", rol)
+
+    return RedirectResponse(
+        url=f"/procedimientos/{procedimiento_id}",
+        status_code=303
+    )
+
+
+@router.post("/procedimientos/{procedimiento_id}/materiales/agregar")
+async def agregar_material_procedimiento(
+    procedimiento_id: int,
+    nombre: str = Form(...),
+    tipo_material: str = Form(None),
+    cantidad: str = Form("1"),
+    notas: str = Form(None),
+    db: Session = Depends(get_db)
+):
+    procedimiento = db.query(Procedimiento).filter(Procedimiento.id == procedimiento_id).first()
+
+    if not procedimiento:
+        raise HTTPException(status_code=404, detail="Procedimiento no encontrado")
+
+    cantidad_int = int(cantidad) if cantidad and cantidad.isdigit() else 1
+
+    material = MaterialProcedimiento(
+        procedimiento_id=procedimiento_id,
+        nombre=nombre,
+        tipo_material=tipo_material,
+        cantidad=cantidad_int,
+        notas=notas,
+    )
+
+    db.add(material)
+    db.commit()
+
+    asegurar_tag(db, "material", nombre)
+    asegurar_tag(db, "tipo_material", tipo_material)
+
+    return RedirectResponse(
+        url=f"/procedimientos/{procedimiento_id}",
+        status_code=303
     )
 
 
