@@ -156,6 +156,67 @@ def activar_tag_repositorio(
     )
 
 
+
+@router.post("/repositorios/{tag_id}/fusionar")
+def fusionar_tag_repositorio(
+    tag_id: int,
+    destino_id: int = Form(...),
+    db: Session = Depends(get_db)
+):
+    origen = db.query(RepositorioTag).filter(RepositorioTag.id == tag_id).first()
+    destino = db.query(RepositorioTag).filter(RepositorioTag.id == destino_id).first()
+
+    if not origen or not destino:
+        raise HTTPException(status_code=404, detail="Tag no encontrado")
+
+    if origen.id == destino.id:
+        return RedirectResponse(url="/repositorios", status_code=303)
+
+    if origen.tipo != destino.tipo:
+        raise HTTPException(status_code=400, detail="Solo se pueden fusionar tags del mismo tipo")
+
+    nombre_origen = origen.nombre
+    nombre_destino = destino.nombre
+
+    if origen.tipo == "persona":
+        db.query(ParticipanteProcedimiento).filter(
+            ParticipanteProcedimiento.nombre == nombre_origen
+        ).update({"nombre": nombre_destino})
+
+    elif origen.tipo == "rol_procedimiento":
+        db.query(ParticipanteProcedimiento).filter(
+            ParticipanteProcedimiento.rol == nombre_origen
+        ).update({"rol": nombre_destino})
+
+    elif origen.tipo == "material":
+        db.query(MaterialProcedimiento).filter(
+            MaterialProcedimiento.nombre == nombre_origen
+        ).update({"nombre": nombre_destino})
+
+    elif origen.tipo == "tipo_material":
+        db.query(MaterialProcedimiento).filter(
+            MaterialProcedimiento.tipo_material == nombre_origen
+        ).update({"tipo_material": nombre_destino})
+
+    elif origen.tipo == "procedimiento":
+        db.query(Procedimiento).filter(
+            Procedimiento.procedimiento == nombre_origen
+        ).update({"procedimiento": nombre_destino})
+
+    elif origen.tipo == "institucion":
+        db.query(Procedimiento).filter(
+            Procedimiento.institucion == nombre_origen
+        ).update({"institucion": nombre_destino})
+
+    origen.activo = False
+    db.commit()
+
+    return RedirectResponse(
+        url="/repositorios",
+        status_code=303
+    )
+
+
 @router.get("/procedimientos")
 def listar_procedimientos(db: Session = Depends(get_db)):
     return db.query(Procedimiento).order_by(Procedimiento.id.desc()).all()

@@ -719,3 +719,21 @@ video {
     grid-template-columns: 1fr;
   }
 }
+
+/* ANGIO-007: fusion de tags */
+.repo-merge-form {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.repo-merge-form select {
+  margin-bottom: 0;
+}
+
+@media (max-width: 760px) {
+  .repo-merge-form {
+    grid-template-columns: 1fr;
+  }
+}

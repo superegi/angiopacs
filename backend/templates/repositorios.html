@@ -39,6 +39,18 @@
                         <button type="submit">Renombrar</button>
                     </form>
 
+                    <form method="post" action="/repositorios/{{ item.id }}/fusionar" class="repo-merge-form">
+                        <select name="destino_id" required>
+                            <option value="">Fusionar en...</option>
+                            {% for destino in items %}
+                                {% if destino.id != item.id and destino.activo %}
+                                <option value="{{ destino.id }}">{{ destino.nombre }}</option>
+                                {% endif %}
+                            {% endfor %}
+                        </select>
+                        <button type="submit">Fusionar</button>
+                    </form>
+
                     {% if item.activo %}
                     <form method="post" action="/repositorios/{{ item.id }}/desactivar">
                         <button type="submit" class="btn-danger">Desactivar</button>
