@@ -77,7 +77,7 @@
 
                     <div>
                         <label>Hospital / clínica</label>
-                        <input name="lugar" value="{{ lugar }}" placeholder="Ej: Hospital">
+                        <input name="lugar" value="{{ lugar }}" placeholder="Ej: Oulton, hospital, clínica">
                     </div>
 
                     <div class="filters-wide">
@@ -127,39 +127,64 @@
 
                                 <td>
                                     <a href="/procedimientos/{{ p.id }}">
-                                        {{ p.paciente_nombre or "Sin nombre" }}
+                                        {{ p.paciente }}
                                     </a>
                                     {% if p.historia_clinica %}
                                         <div class="small">HC: {{ p.historia_clinica }}</div>
                                     {% endif %}
                                 </td>
 
-                                <td>{{ p.lugar or "" }}</td>
-
                                 <td>
-                                    {% if p.primer_operador %}
-                                        <div><span class="badge">1°</span> {{ p.primer_operador }}</div>
-                                    {% endif %}
-                                    {% if p.segundo_operador %}
-                                        <div><span class="badge">2°</span> {{ p.segundo_operador }}</div>
-                                    {% endif %}
-                                    {% if p.fellow %}
-                                        <div><span class="badge">Fellow</span> {{ p.fellow }}</div>
+                                    {% if p.institucion %}
+                                        {{ p.institucion }}
+                                    {% else %}
+                                        <span class="muted">Sin institución</span>
                                     {% endif %}
                                 </td>
 
-                                <td>{{ p.procedimiento or "" }}</td>
-
-                                <td class="diagnosis-cell">{{ p.diagnostico or "" }}</td>
-
                                 <td>
-                                    <a class="badge badge-img" href="/procedimientos/{{ p.id }}">
-                                        Ver fotos
-                                    </a>
+                                    {% if p.operadores %}
+                                        {% for op in p.operadores %}
+                                            <div>
+                                                <span class="badge">{{ op.rol }}</span>
+                                                {{ op.nombre }}
+                                            </div>
+                                        {% endfor %}
+                                    {% else %}
+                                        <span class="muted">Sin operadores</span>
+                                    {% endif %}
                                 </td>
 
                                 <td>
-                                    {% if p.dicom_orthanc_id or p.study_instance_uid %}
+                                    {% if p.procedimiento %}
+                                        {{ p.procedimiento }}
+                                    {% else %}
+                                        <span class="muted">Sin procedimiento</span>
+                                    {% endif %}
+                                </td>
+
+                                <td class="diagnosis-cell">
+                                    {% if p.diagnostico %}
+                                        {{ p.diagnostico }}
+                                    {% else %}
+                                        <span class="muted">Sin diagnóstico</span>
+                                    {% endif %}
+                                </td>
+
+                                <td>
+                                    {% if p.tiene_archivos %}
+                                        <a class="badge badge-img" href="/procedimientos/{{ p.id }}">
+                                            Ver archivos
+                                        </a>
+                                    {% else %}
+                                        <a class="badge" href="/procedimientos/{{ p.id }}">
+                                            Agregar archivos
+                                        </a>
+                                    {% endif %}
+                                </td>
+
+                                <td>
+                                    {% if p.tiene_dicom %}
                                         <a class="badge badge-img" href="/procedimientos/{{ p.id }}">
                                             Explorador DICOM
                                         </a>
