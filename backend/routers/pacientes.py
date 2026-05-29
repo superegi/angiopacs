@@ -66,6 +66,34 @@ def listar_nombres_tag(db: Session, tipo: str):
 
 
 
+
+@router.get("/repositorios")
+def ver_repositorios(
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    tags = (
+        db.query(RepositorioTag)
+        .order_by(RepositorioTag.tipo.asc(), RepositorioTag.nombre.asc())
+        .all()
+    )
+
+    agrupados = {}
+
+    for tag in tags:
+        if tag.tipo not in agrupados:
+            agrupados[tag.tipo] = []
+        agrupados[tag.tipo].append(tag)
+
+    return templates.TemplateResponse(
+        request=request,
+        name="repositorios.html",
+        context={
+            "agrupados": agrupados,
+        }
+    )
+
+
 @router.get("/procedimientos")
 def listar_procedimientos(db: Session = Depends(get_db)):
     return db.query(Procedimiento).order_by(Procedimiento.id.desc()).all()

@@ -646,3 +646,27 @@ video {
     grid-template-columns: 1fr;
   }
 }
+
+/* ANGIO-005: repositorios / tags */
+.tag-cloud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.tag-chip {
+  display: inline-block;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: #ede4cf;
+  border: 1px solid var(--border);
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.tag-disabled {
+  opacity: .45;
+  text-decoration: line-through;
+}

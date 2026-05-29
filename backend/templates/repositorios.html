@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Repositorios AngioPACS</title>
+<link rel="stylesheet" href="/static/css/style.css">
+</head>
+
+<body>
+
+<header class="topbar">
+    <div class="brand">
+        <h1>AngioPACS</h1>
+        <span>Repositorios / tags</span>
+    </div>
+</header>
+
+<main class="container">
+
+<a class="btn btn-secondary" href="/">Volver</a>
+
+<div class="card">
+    <h1>Repositorios</h1>
+    <p class="small">
+        Estos valores alimentan el autocompletado dinámico de participantes, roles, materiales y otros campos estructurados.
+    </p>
+</div>
+
+{% if agrupados %}
+    {% for tipo, items in agrupados.items() %}
+    <div class="card">
+        <h2 class="card-title">{{ tipo }}</h2>
+
+        <div class="tag-cloud">
+            {% for item in items %}
+                <span class="tag-chip {% if not item.activo %}tag-disabled{% endif %}">
+                    {{ item.nombre }}
+                </span>
+            {% endfor %}
+        </div>
+    </div>
+    {% endfor %}
+{% else %}
+    <div class="card">
+        <h2 class="card-title">Sin datos</h2>
+        <p class="small">
+            Aún no hay tags registrados. Se crearán automáticamente al agregar participantes y materiales.
+        </p>
+    </div>
+{% endif %}
+
+</main>
+
+</body>
+</html>
