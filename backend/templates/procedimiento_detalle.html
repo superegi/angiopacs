@@ -37,6 +37,122 @@
 </div>
 
 <div class="card">
+    <h2 class="card-title">Participantes estructurados</h2>
+
+    {% if participantes %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Nombre</th>
+                    <th>Rol</th>
+                    <th>Notas</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for participante in participantes %}
+                <tr>
+                    <td>{{ participante.nombre }}</td>
+                    <td>{{ participante.rol }}</td>
+                    <td>{{ participante.notas or "" }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p class="small">Aún no hay participantes estructurados.</p>
+    {% endif %}
+</div>
+
+<div class="card">
+    <h2 class="card-title">Materiales estructurados</h2>
+
+    {% if materiales %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Nombre</th>
+                    <th>Tipo</th>
+                    <th>Cantidad</th>
+                    <th>Notas</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for material in materiales %}
+                <tr>
+                    <td>{{ material.nombre }}</td>
+                    <td>{{ material.tipo_material or "" }}</td>
+                    <td>{{ material.cantidad or "" }}</td>
+                    <td>{{ material.notas or "" }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p class="small">Aún no hay materiales estructurados.</p>
+    {% endif %}
+</div>
+
+<div class="card">
+    <h2 class="card-title">Estudios DICOM estructurados</h2>
+
+    {% if estudios_dicom %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Study UID</th>
+                    <th>Orthanc</th>
+                    <th>Rol</th>
+                    <th>Estado</th>
+                    <th>Paciente</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for estudio in estudios_dicom %}
+                <tr>
+                    <td>{{ estudio.study_instance_uid }}</td>
+                    <td>{{ estudio.orthanc_study_id or "" }}</td>
+                    <td>{{ estudio.rol_en_caso or "" }}</td>
+                    <td>{{ estudio.estado or "" }}</td>
+                    <td>{{ estudio.patient_name or "" }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p class="small">Aún no hay estudios DICOM estructurados asociados.</p>
+    {% endif %}
+</div>
+
+<div class="card">
+    <h2 class="card-title">Sugerencias IA pendientes</h2>
+
+    {% if sugerencias_ia %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Tarea</th>
+                    <th>Campo</th>
+                    <th>Valor sugerido</th>
+                    <th>Confianza</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for sugerencia in sugerencias_ia %}
+                <tr>
+                    <td>{{ sugerencia.tarea }}</td>
+                    <td>{{ sugerencia.campo_destino or "" }}</td>
+                    <td>{{ sugerencia.valor_sugerido or "" }}</td>
+                    <td>{{ sugerencia.confianza or "" }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p class="small">No hay sugerencias IA pendientes.</p>
+    {% endif %}
+</div>
+
+<div class="card">
     <h2 class="card-title">Editar caso</h2>
 
     <form method="post" action="/procedimientos/{{ procedimiento.id }}/editar">

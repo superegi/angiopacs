@@ -12,7 +12,7 @@ from services.orthanc_service import subir_dicom_a_orthanc
 
 
 from database import get_db
-from models import Procedimiento, Archivo
+from models import Procedimiento, Archivo, ParticipanteProcedimiento, MaterialProcedimiento, EstudioDICOM, SugerenciaIA
 
 ORTHANC_PUBLIC_URL = os.getenv("ORTHANC_PUBLIC_URL", "http://localhost:8042")
 
@@ -66,6 +66,36 @@ def ver_procedimiento(
 
     dicom_grupos = list(dicom_grupos.values())
 
+    participantes = (
+        db.query(ParticipanteProcedimiento)
+        .filter(ParticipanteProcedimiento.procedimiento_id == procedimiento_id)
+        .order_by(ParticipanteProcedimiento.id.asc())
+        .all()
+    )
+
+    materiales = (
+        db.query(MaterialProcedimiento)
+        .filter(MaterialProcedimiento.procedimiento_id == procedimiento_id)
+        .order_by(MaterialProcedimiento.id.asc())
+        .all()
+    )
+
+    estudios_dicom = (
+        db.query(EstudioDICOM)
+        .filter(EstudioDICOM.procedimiento_id == procedimiento_id)
+        .order_by(EstudioDICOM.id.asc())
+        .all()
+    )
+
+    sugerencias_ia = (
+        db.query(SugerenciaIA)
+        .filter(
+            SugerenciaIA.procedimiento_id == procedimiento_id,
+            SugerenciaIA.estado == "pendiente"
+        )
+        .order_by(SugerenciaIA.id.desc())
+        .all()
+    )
 
     return templates.TemplateResponse(
         request=request,
@@ -74,6 +104,10 @@ def ver_procedimiento(
             "procedimiento": procedimiento,
             "archivos": otros_archivos,
             "dicom_grupos": dicom_grupos,
+            "estudios_dicom": estudios_dicom,
+            "participantes": participantes,
+            "materiales": materiales,
+            "sugerencias_ia": sugerencias_ia,
             "orthanc_public_url": ORTHANC_PUBLIC_URL,
 
         }
