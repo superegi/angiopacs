@@ -544,3 +544,79 @@ video {
     min-width: 1050px;
   }
 }
+
+/* ANGIO-003b: tablas estructuradas en detalle de caso */
+.card table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--card-2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  margin-top: 10px;
+  display: block;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.card thead,
+.card tbody,
+.card tr {
+  width: 100%;
+}
+
+.card th,
+.card td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  font-size: 14px;
+  vertical-align: top;
+}
+
+.card th {
+  background: #ede4cf;
+  color: #2e332f;
+  font-weight: 800;
+}
+
+.card tr:last-child td {
+  border-bottom: none;
+}
+
+.card td {
+  color: var(--text);
+}
+
+.card td:first-child {
+  font-weight: 600;
+}
+
+@media (max-width: 760px) {
+  .two {
+    grid-template-columns: 1fr;
+  }
+
+  .brand {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .container {
+    padding: 0 12px 32px;
+  }
+
+  .card {
+    padding: 16px;
+    border-radius: 14px;
+  }
+
+  .card table {
+    font-size: 13px;
+  }
+
+  .card th,
+  .card td {
+    padding: 8px 10px;
+  }
+}
