@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Auditoría AngioPACS</title>
+<link rel="stylesheet" href="/static/css/style.css">
+</head>
+
+<body>
+
+<header class="topbar">
+    <div class="brand">
+        <h1>AngioPACS</h1>
+        <span>Auditoría de información no vinculada</span>
+    </div>
+</header>
+
+<main class="container">
+
+<a class="btn btn-secondary" href="/">Volver</a>
+<a class="btn" href="/repositorios">Repositorios</a>
+
+<div class="card">
+    <h1>Auditoría</h1>
+    <p class="small">
+        Esta vista detecta estudios DICOM y archivos que existen en el sistema pero no están asociados a ningún caso.
+    </p>
+</div>
+
+<div class="card">
+    <h2 class="card-title">Estudios DICOM huérfanos</h2>
+
+    {% if estudios_huerfanos %}
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Study UID</th>
+                <th>Orthanc</th>
+                <th>Paciente</th>
+                <th>Estado</th>
+                <th>Asociar</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for estudio in estudios_huerfanos %}
+            <tr>
+                <td>{{ estudio.id }}</td>
+                <td>{{ estudio.study_instance_uid }}</td>
+                <td>{{ estudio.orthanc_study_id or "" }}</td>
+                <td>{{ estudio.patient_name or "" }}</td>
+                <td>{{ estudio.estado or "" }}</td>
+                <td>
+                    <form method="post" action="/auditoria/dicom/{{ estudio.id }}/asociar" class="audit-form">
+                        <select name="procedimiento_id" required>
+                            <option value="">Caso...</option>
+                            {% for p in procedimientos %}
+                            <option value="{{ p.id }}">#{{ p.id }} {{ p.paciente_nombre or "" }} {{ p.historia_clinica or "" }}</option>
+                            {% endfor %}
+                        </select>
+                        <input name="rol_en_caso" value="angiografia_procedimiento">
+                        <button type="submit">Asociar</button>
+                    </form>
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="small">No hay estudios DICOM huérfanos.</p>
+    {% endif %}
+</div>
+
+<div class="card">
+    <h2 class="card-title">Archivos huérfanos</h2>
+
+    {% if archivos_huerfanos %}
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Tipo</th>
+                <th>Origen</th>
+                <th>Nombre</th>
+                <th>Estado</th>
+                <th>Asociar</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for archivo in archivos_huerfanos %}
+            <tr>
+                <td>{{ archivo.id }}</td>
+                <td>{{ archivo.tipo or "" }}</td>
+                <td>{{ archivo.origen or "" }}</td>
+                <td>{{ archivo.nombre_original or archivo.ruta }}</td>
+                <td>{{ archivo.estado or "" }}</td>
+                <td>
+                    <form method="post" action="/auditoria/archivo/{{ archivo.id }}/asociar" class="audit-form">
+                        <select name="procedimiento_id" required>
+                            <option value="">Caso...</option>
+                            {% for p in procedimientos %}
+                            <option value="{{ p.id }}">#{{ p.id }} {{ p.paciente_nombre or "" }} {{ p.historia_clinica or "" }}</option>
+                            {% endfor %}
+                        </select>
+                        <button type="submit">Asociar</button>
+                    </form>
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="small">No hay archivos huérfanos.</p>
+    {% endif %}
+</div>
+
+</main>
+
+</body>
+</html>

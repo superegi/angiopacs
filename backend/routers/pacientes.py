@@ -67,6 +67,102 @@ def listar_nombres_tag(db: Session, tipo: str):
 
 
 
+
+@router.get("/auditoria")
+def ver_auditoria(
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    estudios_huerfanos = (
+        db.query(EstudioDICOM)
+        .filter(EstudioDICOM.procedimiento_id.is_(None))
+        .order_by(EstudioDICOM.id.desc())
+        .all()
+    )
+
+    archivos_huerfanos = (
+        db.query(Archivo)
+        .filter(Archivo.procedimiento_id.is_(None))
+        .order_by(Archivo.id.desc())
+        .all()
+    )
+
+    procedimientos = (
+        db.query(Procedimiento)
+        .order_by(Procedimiento.id.desc())
+        .all()
+    )
+
+    return templates.TemplateResponse(
+        request=request,
+        name="auditoria.html",
+        context={
+            "estudios_huerfanos": estudios_huerfanos,
+            "archivos_huerfanos": archivos_huerfanos,
+            "procedimientos": procedimientos,
+        }
+    )
+
+
+@router.post("/auditoria/dicom/{estudio_id}/asociar")
+def asociar_dicom_desde_auditoria(
+    estudio_id: int,
+    procedimiento_id: int = Form(...),
+    rol_en_caso: str = Form("angiografia_procedimiento"),
+    db: Session = Depends(get_db)
+):
+    estudio = db.query(EstudioDICOM).filter(EstudioDICOM.id == estudio_id).first()
+    procedimiento = db.query(Procedimiento).filter(Procedimiento.id == procedimiento_id).first()
+
+    if not estudio:
+        raise HTTPException(status_code=404, detail="Estudio DICOM no encontrado")
+
+    if not procedimiento:
+        raise HTTPException(status_code=404, detail="Procedimiento no encontrado")
+
+    estudio.procedimiento_id = procedimiento_id
+    estudio.rol_en_caso = rol_en_caso
+    estudio.estado = "asociado"
+
+    if estudio.orthanc_study_id:
+        procedimiento.dicom_orthanc_id = estudio.orthanc_study_id
+
+    if estudio.study_instance_uid:
+        procedimiento.study_instance_uid = estudio.study_instance_uid
+
+    db.commit()
+
+    return RedirectResponse(
+        url="/auditoria",
+        status_code=303
+    )
+
+
+@router.post("/auditoria/archivo/{archivo_id}/asociar")
+def asociar_archivo_desde_auditoria(
+    archivo_id: int,
+    procedimiento_id: int = Form(...),
+    db: Session = Depends(get_db)
+):
+    archivo = db.query(Archivo).filter(Archivo.id == archivo_id).first()
+    procedimiento = db.query(Procedimiento).filter(Procedimiento.id == procedimiento_id).first()
+
+    if not archivo:
+        raise HTTPException(status_code=404, detail="Archivo no encontrado")
+
+    if not procedimiento:
+        raise HTTPException(status_code=404, detail="Procedimiento no encontrado")
+
+    archivo.procedimiento_id = procedimiento_id
+    archivo.estado = "asociado"
+    db.commit()
+
+    return RedirectResponse(
+        url="/auditoria",
+        status_code=303
+    )
+
+
 @router.get("/repositorios")
 def ver_repositorios(
     request: Request,

@@ -737,3 +737,22 @@ video {
     grid-template-columns: 1fr;
   }
 }
+
+/* ANGIO-009/010/011: auditoria */
+.audit-form {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(160px, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.audit-form select,
+.audit-form input {
+  margin-bottom: 0;
+}
+
+@media (max-width: 900px) {
+  .audit-form {
+    grid-template-columns: 1fr;
+  }
+}
