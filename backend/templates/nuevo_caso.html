@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Nuevo caso</title>
+<link rel="stylesheet" href="/static/css/style.css">
+</head>
+
+<body>
+<div class="app-shell">
+<aside class="sidebar">
+    <div class="side-brand">
+        <img src="/static/img/logo-neuropacs.png" alt="NeuroPACS" class="side-brand-logo">
+        <div class="side-brand-text">
+            <h1>NeuroPACS</h1>
+            <p>Neurointervención · Registro clínico</p>
+        </div>
+    </div>
+
+    <div class="side-section">Principal</div>
+    <a class="side-link" href="/">Procedimientos</a>
+    <a class="side-link" href="/nuevo-caso">Nuevo caso</a>
+    <a class="side-link" href="/usuarios">Usuarios</a>
+
+    <div class="side-section">Gestión</div>
+    <a class="side-link" href="/repositorios">Repositorios / tags</a>
+    <a class="side-link" href="/auditoria">Auditoría</a>
+
+    <div class="side-section">Análisis</div>
+    <a class="side-link" href="/repositorios">Operadores</a>
+    <a class="side-link" href="/repositorios">Materiales</a>
+    <a class="side-link" href="#">Estadísticas</a>
+
+    <div class="side-section">Usuario</div>
+    <a class="side-link" href="/logout">Cerrar sesión</a>
+</aside>
+
+<div class="main-panel">
+
+
+<header class="topbar">
+    <div class="brand">
+        <h1>NeuroPACS</h1>
+        <span>Nuevo caso</span>
+    </div>
+
+</header>
+
+<main class="container">
+
+<a class="btn btn-secondary" href="/">Volver</a>
+
+<div class="card">
+    <h1>Nuevo caso</h1>
+    <p class="small">
+        Crea un caso desde la web. Luego podrás agregar participantes, materiales, archivos, DICOM y notas.
+    </p>
+
+    <form method="post" action="/nuevo-caso">
+
+        <h2 class="card-title">Identificación</h2>
+
+        <div class="two">
+            <div>
+                <label>Nombre</label>
+                <input name="paciente_nombre" placeholder="Nombre">
+            </div>
+
+            <div>
+                <label>Apellido</label>
+                <input name="paciente_apellido" placeholder="Apellido">
+            </div>
+        </div>
+
+        <div class="three">
+            <div>
+                <label>Sexo</label>
+                <select name="paciente_sexo">
+                    <option value="">Sin especificar</option>
+                    <option value="hombre">Hombre</option>
+                    <option value="mujer">Mujer</option>
+                </select>
+            </div>
+
+            <div>
+                <label>Fecha nacimiento</label>
+                <input id="paciente_fecha_nacimiento" name="paciente_fecha_nacimiento" type="date">
+            </div>
+
+            <div>
+                <label>Edad</label>
+                <input id="edad" name="edad" placeholder="Edad">
+            </div>
+        </div>
+
+        <div class="two">
+            <div>
+                <label>ID / RUT / ficha</label>
+                <input name="paciente_id" placeholder="Identificador">
+            </div>
+
+            <div>
+                <label>Historia clínica</label>
+                <input name="historia_clinica" placeholder="HC">
+            </div>
+        </div>
+
+        <h2 class="card-title">Procedimiento</h2>
+
+        <div class="two">
+            <div>
+                <label>Institución</label>
+                <input name="institucion" list="instituciones" placeholder="Institución">
+                <datalist id="instituciones">
+                    {% for item in sugerencias_instituciones %}
+                    <option value="{{ item }}">
+                    {% endfor %}
+                </datalist>
+            </div>
+
+            <div>
+                <label>Fecha procedimiento</label>
+                <input id="fecha_procedimiento" name="fecha" type="date">
+            </div>
+        </div>
+
+        <label>Procedimiento</label>
+        <input name="procedimiento_txt" list="procedimientos_sugeridos" placeholder="Ej: angiografia_diagnostica">
+        <datalist id="procedimientos_sugeridos">
+            {% for item in sugerencias_procedimientos %}
+            <option value="{{ item }}">
+            {% endfor %}
+        </datalist>
+
+        <label>Diagnóstico</label>
+        <textarea name="diagnostico" placeholder="Diagnóstico o motivo del procedimiento"></textarea>
+
+        <label>Presentación clínica</label>
+        <textarea name="presentacion_clinica" placeholder="Presentación clínica breve"></textarea>
+
+        <button type="submit">Crear caso</button>
+
+    </form>
+</div>
+
+</main>
+
+<script>
+function calcularEdadAngio() {
+    const fn = document.getElementById("paciente_fecha_nacimiento");
+    const fp = document.getElementById("fecha_procedimiento");
+    const edad = document.getElementById("edad");
+
+    if (!fn || !fp || !edad || !fn.value) {
+        return;
+    }
+
+    const nacimiento = new Date(fn.value + "T00:00:00");
+    const referencia = fp.value ? new Date(fp.value + "T00:00:00") : new Date();
+
+    let anios = referencia.getFullYear() - nacimiento.getFullYear();
+    const m = referencia.getMonth() - nacimiento.getMonth();
+
+    if (m < 0 || (m === 0 && referencia.getDate() < nacimiento.getDate())) {
+        anios--;
+    }
+
+    if (!Number.isNaN(anios) && anios >= 0) {
+        edad.value = anios;
+    }
+}
+
+document.addEventListener("DOMContentLoaded", function() {
+    const fn = document.getElementById("paciente_fecha_nacimiento");
+    const fp = document.getElementById("fecha_procedimiento");
+
+    if (fn) fn.addEventListener("change", calcularEdadAngio);
+    if (fp) fp.addEventListener("change", calcularEdadAngio);
+});
+</script>
+</div>
+</div>
+
+<!-- NeuroPACS: alerta de cambios no guardados -->
+<div id="save-status" class="save-status saved" style="display:none;">Guardado</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    let dirty = false;
+    const status = document.getElementById("save-status");
+
+    function showStatus(text, cls) {
+        if (!status) return;
+        status.style.display = "block";
+        status.textContent = text;
+        status.className = "save-status " + cls;
+    }
+
+    function setDirty() {
+        dirty = true;
+        showStatus("Cambios sin guardar", "dirty");
+    }
+
+    const fields = document.querySelectorAll("input, textarea, select");
+    const forms = document.querySelectorAll("form");
+
+    fields.forEach(function (field) {
+        field.addEventListener("input", setDirty);
+        field.addEventListener("change", setDirty);
+    });
+
+    forms.forEach(function (form) {
+        form.addEventListener("submit", function () {
+            dirty = false;
+            showStatus("Guardando...", "saving");
+        });
+    });
+
+    window.addEventListener("beforeunload", function (event) {
+        if (!dirty) return;
+
+        event.preventDefault();
+        event.returnValue = "";
+    });
+});
+</script>
+
+</body>
+</html>

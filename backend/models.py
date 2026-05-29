@@ -22,6 +22,7 @@ class Procedimiento(Base):
     institucion = Column(String(255), nullable=True)
     historia_clinica = Column(String(100), index=True, nullable=True)
     fecha = Column(Date, nullable=True)
+    proxima_visita_agendada = Column(Date, nullable=True)
     procedimiento = Column(String(255), nullable=True)
     diagnostico = Column(Text, nullable=True)
 
@@ -64,6 +65,7 @@ class Procedimiento(Base):
 
     # Resultado / informe
     informe_procedimiento = Column(Text, nullable=True)
+    indicaciones = Column(Text, nullable=True)
     complicaciones_si_no = Column(String(20), nullable=True)
     complicaciones = Column(Text, nullable=True)
     medicacion = Column(Text, nullable=True)
@@ -99,6 +101,7 @@ class Archivo(Base):
 
     tipo = Column(String(50), nullable=True)
     categoria = Column(String(100), nullable=True)
+    caption = Column(Text, nullable=True)
     origen = Column(String(50), nullable=True)
     ruta = Column(Text, nullable=False)
 

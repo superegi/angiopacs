@@ -7,33 +7,205 @@
 </head>
 
 <body>
+<div class="app-shell">
+<aside class="sidebar">
+    <div class="side-brand">
+        <img src="/static/img/logo-neuropacs.png" alt="NeuroPACS" class="side-brand-logo">
+        <div class="side-brand-text">
+            <h1>NeuroPACS</h1>
+            <p>Neurointervención · Registro clínico</p>
+        </div>
+    </div>
+
+    <div class="side-section">Principal</div>
+    <a class="side-link" href="/">Procedimientos</a>
+    <a class="side-link" href="/nuevo-caso">Nuevo caso</a>
+    <a class="side-link" href="/usuarios">Usuarios</a>
+
+    <div class="side-section">Gestión</div>
+    <a class="side-link" href="/repositorios">Repositorios / tags</a>
+    <a class="side-link" href="/auditoria">Auditoría</a>
+
+    <div class="side-section">Análisis</div>
+    <a class="side-link" href="/repositorios">Operadores</a>
+    <a class="side-link" href="/repositorios">Materiales</a>
+    <a class="side-link" href="#">Estadísticas</a>
+
+    <div class="side-section">Usuario</div>
+    <a class="side-link" href="/logout">Cerrar sesión</a>
+</aside>
+
+<div class="main-panel">
+
 
 <header class="topbar">
     <div class="brand">
-        <h1>AngioPACS</h1>
+        <h1>NeuroPACS</h1>
         <span>Detalle del procedimiento #{{ procedimiento.id }}</span>
     </div>
+
 </header>
 
 <main class="container">
 
-<a class="btn btn-secondary" href="/">← Volver</a>
+<a class="btn btn-secondary" href="/">← Volver</a><a class="btn" href="/procedimientos/{{ procedimiento.id }}/exportar">Exportar ZIP</a>
+
+<div class="card case-summary-card">
+    <h1>{{ (procedimiento.paciente_nombre or "Sin nombre") }} {{ procedimiento.paciente_apellido or "" }}</h1>
+
+    <div class="case-summary-text">
+        <p>
+            <b>ID paciente:</b> {{ procedimiento.paciente_id or "—" }}
+            &nbsp; · &nbsp;
+            <b>HC:</b> {{ procedimiento.historia_clinica or "—" }}
+        </p>
+
+        <p>
+            <b>Fecha procedimiento:</b> {{ procedimiento.fecha or "—" }}
+            &nbsp; · &nbsp;
+            <b>Institución:</b> {{ procedimiento.institucion or "—" }}
+            &nbsp; · &nbsp;
+            <b>Procedimiento:</b> {{ procedimiento.procedimiento or "—" }}
+        </p>
+
+        <p>
+            <b>Próxima visita:</b> {{ procedimiento.proxima_visita_agendada or "—" }}
+        </p>
+    </div>
+
+    <div class="summary-operators">
+        <b>Operadores:</b>
+        {% set ns = namespace(count=0) %}
+        {% for participante in participantes %}
+            {% if participante.rol in ["primer_operador", "segundo_operador", "tercer_operador", "cuarto_operador", "fellow"] %}
+                {% set ns.count = ns.count + 1 %}
+                <span class="operator-chip">{{ participante.rol }}: {{ participante.nombre }}</span>
+            {% endif %}
+        {% endfor %}
+        {% if ns.count == 0 %}
+            <span class="small">Sin operadores estructurados.</span>
+        {% endif %}
+    </div>
+</div>
+
+
 
 <div class="card">
-    <h1>{{ procedimiento.paciente_nombre or "Sin nombre" }}</h1>
-    <p><b>ID:</b> {{ procedimiento.id }}</p>
-    <p><b>HC:</b> {{ procedimiento.historia_clinica or "" }}</p>
+    <h2 class="card-title">Identificación del caso</h2>
+
+    <form method="post" action="/procedimientos/{{ procedimiento.id }}/editar">
+
+        <div class="two">
+            <div>
+                <label>Nombre</label>
+                <input name="paciente_nombre" value="{{ procedimiento.paciente_nombre or '' }}">
+            </div>
+
+            <div>
+                <label>Apellido</label>
+                <input name="paciente_apellido" value="{{ procedimiento.paciente_apellido or '' }}">
+            </div>
+        </div>
+
+        <div class="three">
+            <div>
+                <label>Sexo</label>
+                <select name="paciente_sexo">
+                    <option value="">Sin especificar</option>
+                    <option value="hombre" {% if procedimiento.paciente_sexo == "hombre" %}selected{% endif %}>Hombre</option>
+                    <option value="mujer" {% if procedimiento.paciente_sexo == "mujer" %}selected{% endif %}>Mujer</option>
+                </select>
+            </div>
+
+            <div>
+                <label>Fecha nacimiento</label>
+                <input id="paciente_fecha_nacimiento" name="paciente_fecha_nacimiento" type="date" value="{{ procedimiento.paciente_fecha_nacimiento or '' }}">
+            </div>
+
+            <div>
+                <label>Edad</label>
+                <input id="edad" name="edad" value="{{ procedimiento.edad or '' }}">
+            </div>
+        </div>
+
+        <div class="two">
+            <div>
+                <label>ID / RUT / ficha</label>
+                <input name="paciente_id" value="{{ procedimiento.paciente_id or '' }}">
+            </div>
+
+            <div>
+                <label>Historia clínica</label>
+                <input name="historia_clinica" value="{{ procedimiento.historia_clinica or '' }}">
+            </div>
+        </div>
+
+        <div class="two">
+            <div>
+                <label>Institución</label>
+                <input name="institucion" list="instituciones_caso" value="{{ procedimiento.institucion or '' }}" placeholder="Institución">
+                <datalist id="instituciones_caso">
+                    {% for item in sugerencias_instituciones or [] %}
+                    <option value="{{ item }}">
+                    {% endfor %}
+                </datalist>
+            </div>
+
+            <div>
+                <label>Fecha procedimiento</label>
+                <input id="fecha_procedimiento" name="fecha" type="date" value="{{ procedimiento.fecha or '' }}">
+            </div>
+        </div>
+<button type="submit">Guardar identificación</button>
+    </form>
 </div>
 
 <div class="card">
-    <h2 class="card-title">Operadores frecuentes</h2>
-    <div class="operator-strip">
-        <span class="operator-chip">Operador 1</span>
-        <span class="operator-chip">Operador 2</span>
-        <span class="operator-chip">Fellow</span>
-        <span class="operator-chip">Anestesista</span>
-    </div>
-    <p class="small">Luego estos nombres saldrán desde la base de datos y servirán para autocompletar.</p>
+    <h2 class="card-title">Procedimiento clínico</h2>
+
+    <form method="post" action="/procedimientos/{{ procedimiento.id }}/editar">
+
+        <label>Procedimiento</label>
+        <input name="procedimiento_txt" list="procedimientos_caso" value="{{ procedimiento.procedimiento or '' }}" placeholder="Ej: angiografia_diagnostica">
+        <datalist id="procedimientos_caso">
+            {% for item in sugerencias_procedimientos or [] %}
+            <option value="{{ item }}">
+            {% endfor %}
+        </datalist>
+
+        <label>Diagnóstico</label>
+        <textarea name="diagnostico">{{ procedimiento.diagnostico or '' }}</textarea>
+
+        <label>Presentación clínica</label>
+        <textarea name="presentacion_clinica">{{ procedimiento.presentacion_clinica or '' }}</textarea>
+
+        <label>Indicaciones</label>
+        <textarea name="indicaciones">{{ procedimiento.indicaciones or '' }}</textarea>
+
+        <div class="two">
+            <div>
+                <label>Complicaciones</label>
+                <select name="complicaciones_si_no">
+                    <option value="">Sin especificar</option>
+                    <option value="no" {% if procedimiento.complicaciones_si_no == "no" %}selected{% endif %}>No</option>
+                    <option value="si" {% if procedimiento.complicaciones_si_no == "si" %}selected{% endif %}>Sí</option>
+                </select>
+            </div>
+
+            <div>
+                <label>Cuál complicación</label>
+                <input name="complicaciones" value="{{ procedimiento.complicaciones or '' }}">
+            </div>
+        </div>
+
+        <label>Notas adicionales</label>
+        <textarea name="notas_adicionales">{{ procedimiento.notas_adicionales or '' }}</textarea>
+
+        <label>Próxima visita agendada</label>
+        <input name="proxima_visita_agendada" type="date" value="{{ procedimiento.proxima_visita_agendada or '' }}">
+
+        <button type="submit">Guardar procedimiento clínico</button>
+    </form>
 </div>
 
 <div class="card">
@@ -46,6 +218,7 @@
                     <th>Nombre</th>
                     <th>Rol</th>
                     <th>Notas</th>
+                    <th>Acción</th>
                 </tr>
             </thead>
             <tbody>
@@ -54,6 +227,11 @@
                     <td>{{ participante.nombre }}</td>
                     <td>{{ participante.rol }}</td>
                     <td>{{ participante.notas or "" }}</td>
+                    <td>
+                        <form method="post" action="/procedimientos/{{ procedimiento.id }}/participantes/{{ participante.id }}/eliminar" onsubmit="return confirm('¿Eliminar este participante del caso?');">
+                            <button type="submit" class="btn-danger btn-small">Eliminar</button>
+                        </form>
+                    </td>
                 </tr>
             {% endfor %}
             </tbody>
@@ -101,6 +279,7 @@
                     <th>Tipo</th>
                     <th>Cantidad</th>
                     <th>Notas</th>
+                    <th>Acción</th>
                 </tr>
             </thead>
             <tbody>
@@ -110,6 +289,11 @@
                     <td>{{ material.tipo_material or "" }}</td>
                     <td>{{ material.cantidad or "" }}</td>
                     <td>{{ material.notas or "" }}</td>
+                    <td>
+                        <form method="post" action="/procedimientos/{{ procedimiento.id }}/materiales/{{ material.id }}/eliminar" onsubmit="return confirm('¿Eliminar este material del caso?');">
+                            <button type="submit" class="btn-danger btn-small">Eliminar</button>
+                        </form>
+                    </td>
                 </tr>
             {% endfor %}
             </tbody>
@@ -211,129 +395,19 @@
 </div>
 
 <div class="card">
-    <h2 class="card-title">Editar caso</h2>
-
-    <form method="post" action="/procedimientos/{{ procedimiento.id }}/editar">
-
-        <div class="two">
-            <div>
-                <label>Lugar</label>
-                <input name="lugar" value="{{ procedimiento.lugar or '' }}">
-            </div>
-
-            <div>
-                <label>Historia clínica</label>
-                <input name="historia_clinica" value="{{ procedimiento.historia_clinica or '' }}">
-            </div>
-        </div>
-
-        <label>Nombre paciente</label>
-        <input name="paciente_nombre" value="{{ procedimiento.paciente_nombre or '' }}">
-
-        <div class="two">
-            <div>
-                <label>Edad</label>
-                <input name="edad" value="{{ procedimiento.edad or '' }}">
-            </div>
-
-            <div>
-                <label>Procedimiento</label>
-                <input name="procedimiento_txt" value="{{ procedimiento.procedimiento or '' }}">
-            </div>
-        </div>
-
-        <label>Diagnóstico</label>
-        <textarea name="diagnostico">{{ procedimiento.diagnostico or '' }}</textarea>
-
-        <label>Localización aneurisma</label>
-        <textarea name="localizacion_aneurisma">{{ procedimiento.localizacion_aneurisma or '' }}</textarea>
-
-        <div class="two">
-            <div>
-                <label>1er operador</label>
-                <input name="primer_operador" list="operadores" value="{{ procedimiento.primer_operador or '' }}">
-            </div>
-
-            <div>
-                <label>2do operador</label>
-                <input name="segundo_operador" list="operadores" value="{{ procedimiento.segundo_operador or '' }}">
-            </div>
-        </div>
-
-        <label>Fellow</label>
-        <input name="fellow" list="operadores" value="{{ procedimiento.fellow or '' }}">
-
-        <datalist id="operadores">
-            <option value="Operador 1">
-            <option value="Operador 2">
-            <option value="Fellow">
-            <option value="Anestesista">
-        </datalist>
-
-        <label>Presentación clínica</label>
-        <textarea name="presentacion_clinica">{{ procedimiento.presentacion_clinica or '' }}</textarea>
-
-        <h3>Materiales</h3>
-
-        <div class="two">
-            <div>
-                <label>Vaina</label>
-                <input name="vaina" value="{{ procedimiento.vaina or '' }}">
-            </div>
-
-            <div>
-                <label>Catéter</label>
-                <input name="cateter" value="{{ procedimiento.cateter or '' }}">
-            </div>
-        </div>
-
-        <div class="two">
-            <div>
-                <label>Catéter intermedio</label>
-                <input name="cateter_intermedio" value="{{ procedimiento.cateter_intermedio or '' }}">
-            </div>
-
-            <div>
-                <label>Microcatéter</label>
-                <input name="microcateter" value="{{ procedimiento.microcateter or '' }}">
-            </div>
-        </div>
-
-        <div class="two">
-            <div>
-                <label>Guía</label>
-                <input name="guia" value="{{ procedimiento.guia or '' }}">
-            </div>
-
-            <div>
-                <label>Microguía</label>
-                <input name="microguia" value="{{ procedimiento.microguia or '' }}">
-            </div>
-        </div>
-
-        <label>Flow diverter / Stent / Dispositivo</label>
-        <input name="fd" value="{{ procedimiento.fd or '' }}">
-
-        <label>Materiales usados</label>
-        <textarea name="materiales_usados">{{ procedimiento.materiales_usados or '' }}</textarea>
-
-        <label>Complicaciones</label>
-        <textarea name="complicaciones">{{ procedimiento.complicaciones or '' }}</textarea>
-
-        <label>Notas adicionales</label>
-        <textarea name="notas_adicionales">{{ procedimiento.notas_adicionales or '' }}</textarea>
-
-        <button type="submit">Guardar cambios</button>
-
-    </form>
-</div>
-
-<div class="card">
     <h2 class="card-title">Subir archivo a este caso</h2>
 
     <form method="post" action="/procedimientos/{{ procedimiento.id }}/subir-archivo" enctype="multipart/form-data">
-        <input type="file" name="archivo">
-        <button type="submit">Subir</button>
+        <label>Archivo</label>
+        <input type="file" name="archivo" required>
+
+        <label>Categoría</label>
+        <input name="categoria" list="categorias_archivo" placeholder="Ej: estudio_previo">
+
+        <label>Caption</label>
+        <textarea name="caption" placeholder="Ej: AngioTC previa, control post procedimiento, foto del material usado"></textarea>
+
+        <button type="submit">Subir archivo</button>
     </form>
 </div>
 
@@ -393,14 +467,128 @@
 <p class="small">
     {{ archivo.nombre_original or "" }}
 </p>
+
+{% if archivo.categoria %}
+<p class="small"><b>Categoría:</b> {{ archivo.categoria }}</p>
+{% endif %}
+
+{% if archivo.caption %}
+<p><b>Caption:</b> {{ archivo.caption }}</p>
+{% endif %}
+
 <p class="small">
     {{ archivo.creado_en }}
 </p>
+
+<form method="post" action="/archivos/{{ archivo.id }}/metadata" class="file-meta-form">
+    <label>Categoría</label>
+    <input name="categoria" list="categorias_archivo" value="{{ archivo.categoria or '' }}" placeholder="Ej: estudio_previo">
+
+    <label>Caption</label>
+    <textarea name="caption" placeholder="Descripción visible del archivo">{{ archivo.caption or '' }}</textarea>
+
+    <button type="submit">Guardar metadata</button>
+</form>
+
+<form method="post" action="/archivos/{{ archivo.id }}/eliminar" onsubmit="return confirm('¿Eliminar este archivo del caso?');">
+    <button type="submit" class="btn-danger">Eliminar archivo</button>
+</form>
 </div>
 {% endfor %}
 </div>
 
+<datalist id="categorias_archivo">
+    <option value="estudio_previo">
+    <option value="estudio_control">
+    <option value="dicom_procedimiento">
+    <option value="dicom_otro">
+    <option value="imagen_material">
+    <option value="foto_dicom">
+    <option value="documento">
+    <option value="otro">
+</datalist>
+
 </main>
+
+<script>
+function calcularEdadAngio() {
+    const fn = document.getElementById("paciente_fecha_nacimiento");
+    const fp = document.getElementById("fecha_procedimiento");
+    const edad = document.getElementById("edad");
+
+    if (!fn || !fp || !edad || !fn.value) {
+        return;
+    }
+
+    const nacimiento = new Date(fn.value + "T00:00:00");
+    const referencia = fp.value ? new Date(fp.value + "T00:00:00") : new Date();
+
+    let anios = referencia.getFullYear() - nacimiento.getFullYear();
+    const m = referencia.getMonth() - nacimiento.getMonth();
+
+    if (m < 0 || (m === 0 && referencia.getDate() < nacimiento.getDate())) {
+        anios--;
+    }
+
+    if (!Number.isNaN(anios) && anios >= 0) {
+        edad.value = anios;
+    }
+}
+
+document.addEventListener("DOMContentLoaded", function() {
+    const fn = document.getElementById("paciente_fecha_nacimiento");
+    const fp = document.getElementById("fecha_procedimiento");
+
+    if (fn) fn.addEventListener("change", calcularEdadAngio);
+    if (fp) fp.addEventListener("change", calcularEdadAngio);
+});
+</script>
+</div>
+</div>
+
+<!-- NeuroPACS: alerta de cambios no guardados -->
+<div id="save-status" class="save-status saved" style="display:none;">Guardado</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    let dirty = false;
+    const status = document.getElementById("save-status");
+
+    function showStatus(text, cls) {
+        if (!status) return;
+        status.style.display = "block";
+        status.textContent = text;
+        status.className = "save-status " + cls;
+    }
+
+    function setDirty() {
+        dirty = true;
+        showStatus("Cambios sin guardar", "dirty");
+    }
+
+    const fields = document.querySelectorAll("input, textarea, select");
+    const forms = document.querySelectorAll("form");
+
+    fields.forEach(function (field) {
+        field.addEventListener("input", setDirty);
+        field.addEventListener("change", setDirty);
+    });
+
+    forms.forEach(function (form) {
+        form.addEventListener("submit", function () {
+            dirty = false;
+            showStatus("Guardando...", "saving");
+        });
+    });
+
+    window.addEventListener("beforeunload", function (event) {
+        if (!dirty) return;
+
+        event.preventDefault();
+        event.returnValue = "";
+    });
+});
+</script>
 
 </body>
 </html>

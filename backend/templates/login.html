@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Login - AngioPACS</title>
+    <title>Login - NeuroPACS</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
@@ -10,8 +10,13 @@
 
 <div class="login-shell">
     <div class="login-card">
-        <div class="login-brand">AngioPACS</div>
-        <div class="login-subtitle">Registro neurointervencional</div>
+        <div class="login-brand-with-logo">
+            <img src="/static/img/logo-neuropacs.png" alt="NeuroPACS" class="login-brand-logo">
+            <div>
+                <div class="login-brand">NeuroPACS</div>
+                <div class="login-subtitle">Registro neurointervencional</div>
+            </div>
+        </div>
 
         {% if error %}
             <div class="login-error">{{ error }}</div>
@@ -27,9 +32,56 @@
             <button type="submit" class="login-button">Entrar</button>
         </form>
 
-        <p class="small">Acceso privado · AngioPACS</p>
+        <p class="small">Acceso privado · NeuroPACS</p>
     </div>
 </div>
+
+</div>
+</div>
+
+<!-- NeuroPACS: alerta de cambios no guardados -->
+<div id="save-status" class="save-status saved" style="display:none;">Guardado</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    let dirty = false;
+    const status = document.getElementById("save-status");
+
+    function showStatus(text, cls) {
+        if (!status) return;
+        status.style.display = "block";
+        status.textContent = text;
+        status.className = "save-status " + cls;
+    }
+
+    function setDirty() {
+        dirty = true;
+        showStatus("Cambios sin guardar", "dirty");
+    }
+
+    const fields = document.querySelectorAll("input, textarea, select");
+    const forms = document.querySelectorAll("form");
+
+    fields.forEach(function (field) {
+        field.addEventListener("input", setDirty);
+        field.addEventListener("change", setDirty);
+    });
+
+    forms.forEach(function (form) {
+        form.addEventListener("submit", function () {
+            dirty = false;
+            showStatus("Guardando...", "saving");
+        });
+    });
+
+    window.addEventListener("beforeunload", function (event) {
+        if (!dirty) return;
+
+        event.preventDefault();
+        event.returnValue = "";
+    });
+});
+</script>
 
 </body>
 </html>

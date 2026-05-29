@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>AngioPACS - Procedimientos</title>
+    <title>NeuroPACS - Procedimientos</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
@@ -11,30 +11,31 @@
 <div class="app-shell">
 
     <aside class="sidebar">
-        <div class="sidebar-logo">AngioPACS</div>
-        <div class="sidebar-subtitle">Neurointervención · Registro clínico</div>
-
-        <div class="nav-section">Principal</div>
-        <a class="nav-link active" href="/">Procedimientos</a>
-
-        {% if request.session.get("rol") == "admin" %}
-        <a class="nav-link" href="/usuarios">Usuarios</a>
-        {% endif %}
-
-        <div class="nav-section">Análisis</div>
-        <a class="nav-link" href="#">Pacientes</a>
-        <a class="nav-link" href="#">Operadores</a>
-        <a class="nav-link" href="#">Materiales</a>
-        <a class="nav-link" href="#">Estadísticas</a>
-
-        <div class="nav-section">Usuario</div>
-        <div class="sidebar-user">
-            <div class="sidebar-user-name">{{ request.session.get("user", "sin usuario") }}</div>
-            <div class="sidebar-user-role">{{ request.session.get("rol", "") }}</div>
+    <div class="side-brand">
+        <img src="/static/img/logo-neuropacs.png" alt="NeuroPACS" class="side-brand-logo">
+        <div class="side-brand-text">
+            <h1>NeuroPACS</h1>
+            <p>Neurointervención · Registro clínico</p>
         </div>
+    </div>
 
-        <a class="nav-link" href="/logout">Cerrar sesión</a>
-    </aside>
+    <div class="side-section">Principal</div>
+    <a class="side-link" href="/">Procedimientos</a>
+    <a class="side-link" href="/nuevo-caso">Nuevo caso</a>
+    <a class="side-link" href="/usuarios">Usuarios</a>
+
+    <div class="side-section">Gestión</div>
+    <a class="side-link" href="/repositorios">Repositorios / tags</a>
+    <a class="side-link" href="/auditoria">Auditoría</a>
+
+    <div class="side-section">Análisis</div>
+    <a class="side-link" href="/repositorios">Operadores</a>
+    <a class="side-link" href="/repositorios">Materiales</a>
+    <a class="side-link" href="#">Estadísticas</a>
+
+    <div class="side-section">Usuario</div>
+    <a class="side-link" href="/logout">Cerrar sesión</a>
+</aside>
 
     <section class="main-panel">
         <header class="topbar">
@@ -42,9 +43,11 @@
                 <h1>Pacientes / Procedimientos</h1>
                 <span>Registro, búsqueda y revisión de casos</span>
             </div>
-        </header>
+        
+</header>
 
         <main class="container">
+<a class="btn" href="/nuevo-caso">Nuevo caso</a>
 
             <section class="summary">
                 <div class="metric">
@@ -177,6 +180,51 @@
     </section>
 
 </div>
+
+
+<!-- NeuroPACS: alerta de cambios no guardados -->
+<div id="save-status" class="save-status saved" style="display:none;">Guardado</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    let dirty = false;
+    const status = document.getElementById("save-status");
+
+    function showStatus(text, cls) {
+        if (!status) return;
+        status.style.display = "block";
+        status.textContent = text;
+        status.className = "save-status " + cls;
+    }
+
+    function setDirty() {
+        dirty = true;
+        showStatus("Cambios sin guardar", "dirty");
+    }
+
+    const fields = document.querySelectorAll("input, textarea, select");
+    const forms = document.querySelectorAll("form");
+
+    fields.forEach(function (field) {
+        field.addEventListener("input", setDirty);
+        field.addEventListener("change", setDirty);
+    });
+
+    forms.forEach(function (form) {
+        form.addEventListener("submit", function () {
+            dirty = false;
+            showStatus("Guardando...", "saving");
+        });
+    });
+
+    window.addEventListener("beforeunload", function (event) {
+        if (!dirty) return;
+
+        event.preventDefault();
+        event.returnValue = "";
+    });
+});
+</script>
 
 </body>
 </html>
