@@ -70,7 +70,7 @@
 
                     <div class="filters-wide">
                         <label>Búsqueda general</label>
-                        <input name="buscar" value="{{ buscar }}" placeholder="Paciente, diagnóstico, procedimiento, HC">
+                        <input name="buscar" value="{{ buscar }}" placeholder="Paciente, operador, diagnóstico, procedimiento, HC">
                     </div>
 
                     <div class="filters-actions">
@@ -126,7 +126,7 @@
                                 <th>N caso</th>
                                 <th>
                     <a class="table-sort-link {% if ordenar == 'fecha' %}active{% endif %}" href="/?{{ sort_query_base }}&ordenar=fecha&direccion={{ next_dir_fecha }}">
-                        Fecha procedimiento
+                        Fecha
                         {% if ordenar == 'fecha' %}
                             {% if direccion == 'asc' %}↑{% else %}↓{% endif %}
                         {% endif %}
@@ -143,7 +143,7 @@
                 </th>
                                 <th>Hospital / clínica</th>
                                 <th>Operadores</th>
-                                <th>Gran tipo</th>
+                                <th class="col-procedure-group">Grupo de<br>Procedimiento</th>
                                 <th>Procedimiento</th>
                                 <th>Diagnóstico</th>
                                 <th>Fotos</th>
@@ -165,15 +165,32 @@
                                     {% endif %}
                                 </td>
 
-                                <td>
-                                    <span class="status-pill status-{{ p.estado_caso or 'abierto' }}">
-                                        {{ p.estado_caso or "abierto" }}
+                                <td class="status-cell">
+                                    {% set estado_label = p.estado_caso_label or p.estado_caso or "Abierto" %}
+                                    <span class="status-pill status-{{ p.estado_caso or 'abierto' }} status-multiline">
+                                        {% if estado_label == "Pendiente control ambulatorio" %}
+                                            <span>Pendiente control</span>
+                                            <span>ambulatorio</span>
+                                        {% elif estado_label == "Está hospitalizado" %}
+                                            <span>Está</span>
+                                            <span>hospitalizado</span>
+                                        {% else %}
+                                            <span>{{ estado_label }}</span>
+                                        {% endif %}
                                     </span>
                                 </td>
 
-                                <td>
-                                    <a href="/procedimientos/{{ p.id }}">
-                                        {{ p.paciente }}
+                                <td class="patient-cell">
+                                    <a href="/procedimientos/{{ p.id }}" class="patient-two-line">
+                                        {% if p.paciente_apellido %}
+                                            <span class="patient-lastname">{{ p.paciente_apellido }}</span>
+                                        {% endif %}
+                                        {% if p.paciente_nombre %}
+                                            <span class="patient-firstname">{{ p.paciente_nombre }}</span>
+                                        {% endif %}
+                                        {% if not p.paciente_apellido and not p.paciente_nombre %}
+                                            <span class="patient-lastname">Sin nombre</span>
+                                        {% endif %}
                                     </a>
                                     {% if p.historia_clinica %}
                                         <div class="small">HC: {{ p.historia_clinica }}</div>
@@ -188,32 +205,21 @@
                                     {% endif %}
                                 </td>
 
-                                <td>
-                                    {% set operadores_tabla = p.participantes | selectattr("rol", "in", ["1er operador", "2do operador", "3er operador", "4to operador", "primer_operador", "segundo_operador", "tercer_operador", "cuarto_operador"]) | list %}
-                                    {% if operadores_tabla %}
-                                        {% for op in operadores_tabla %}
-                                            <div>
-                                                <span class="badge">{{ op.rol }}</span>
-                                                {{ op.nombre }}
-                                            </div>
-                                        {% endfor %}
-                                    {% elif p.participantes %}
-                                        {% for op in p.participantes %}
-                                            <div>
-                                                <span class="badge">{{ op.rol or "participante" }}</span>
-                                                {{ op.nombre }}
-                                            </div>
+                                <td class="operators-cell">
+                                    {% if p.operadores_nombres %}
+                                        {% for nombre in p.operadores_nombres %}
+                                            <div class="operator-name-only">{{ nombre }}</div>
                                         {% endfor %}
                                     {% else %}
                                         <span class="muted">Sin operadores</span>
                                     {% endif %}
                                 </td>
 
-                                <td>
-                                    {% if p.tipo_procedimiento %}
-                                        {{ p.tipo_procedimiento | replace("_", " ") }}
+                                <td class="procedure-group-cell">
+                                    {% if p.tipo_procedimiento_label %}
+                                        {{ p.tipo_procedimiento_label }}
                                     {% else %}
-                                        <span class="muted">Sin tipo</span>
+                                        <span class="muted">Sin grupo</span>
                                     {% endif %}
                                 </td>
 

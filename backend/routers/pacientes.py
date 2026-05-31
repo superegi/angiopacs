@@ -2108,10 +2108,75 @@ def _angio_importar_auditoria_caso(db: Session, procedimiento_id: int, eventos_i
 
     return restaurados
 
+
+# ANGIO-EXPORT-LOG-V21
+def angio_v21_usuario_actual(request):
+    try:
+        return (
+            request.session.get("user")
+            or request.session.get("usuario")
+            or request.session.get("username")
+            or "usuario"
+        )
+    except Exception:
+        return "usuario"
+
+
+def angio_v21_set_if_exists(obj, attr, value):
+    try:
+        if hasattr(obj.__class__, attr):
+            setattr(obj, attr, value)
+    except Exception:
+        pass
+
+
+def angio_v21_log_exportacion_caso(db, request, procedimiento_id, tipo_exportacion):
+    """
+    Registra exportación en auditoría general y Actividad del caso.
+    """
+    try:
+        evento = AuditoriaEvento()
+        angio_v21_set_if_exists(evento, "usuario", angio_v21_usuario_actual(request))
+        angio_v21_set_if_exists(evento, "accion", "FICHA_EXPORTED")
+        angio_v21_set_if_exists(evento, "tarea", "exportacion")
+        angio_v21_set_if_exists(evento, "estado", "ok")
+        angio_v21_set_if_exists(evento, "caso_id", procedimiento_id)
+        angio_v21_set_if_exists(evento, "procedimiento_id", procedimiento_id)
+        angio_v21_set_if_exists(
+            evento,
+            "detalle",
+            f"procedimiento_id={procedimiento_id}; caso_exportado; tipo={tipo_exportacion}",
+        )
+
+        try:
+            angio_v21_set_if_exists(evento, "ip", request.client.host if request.client else None)
+            angio_v21_set_if_exists(evento, "user_agent", request.headers.get("user-agent"))
+        except Exception:
+            pass
+
+        try:
+            from services.audit_service import get_client_timezone, get_client_utc_offset_minutes
+            angio_v21_set_if_exists(evento, "client_timezone", get_client_timezone(request))
+            angio_v21_set_if_exists(evento, "client_utc_offset_minutes", get_client_utc_offset_minutes(request))
+        except Exception:
+            pass
+
+        db.add(evento)
+        db.commit()
+        return True
+    except Exception:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        return False
+
+
 @router.get("/procedimientos/{procedimiento_id}/exportar")
 def exportar_procedimiento_zip(
     procedimiento_id: int,
-    db: Session = Depends(get_db)
+    request: Request,
+    db: Session = Depends(get_db),
 ):
     procedimiento = db.query(Procedimiento).filter(Procedimiento.id == procedimiento_id).first()
 
@@ -2334,6 +2399,22 @@ def exportar_procedimiento_zip(
                     zipf.write(src, arcname)
             except Exception:
                 continue
+
+    # ANGIO-LOG-EXPORT-SIN-DICOM-V16
+    _angio_log_exportacion_caso_v16(
+        db=db,
+        request=request,
+        procedimiento_id=procedimiento_id,
+        tipo_exportacion="exportar_sin_dicom",
+    )
+
+    # ANGIO-LOG-EXPORT-SIN-DICOM-V21
+    angio_v21_log_exportacion_caso(
+        db=db,
+        request=request,
+        procedimiento_id=procedimiento_id,
+        tipo_exportacion="exportar_sin_dicom",
+    )
 
     return FileResponse(
         path=zip_path,
@@ -3239,9 +3320,35 @@ def _angio_040_nombre_seguro_zip(valor: str | None) -> str:
     return "".join(limpio).strip("_") or "sin_nombre"
 
 
+
+# ANGIO-EXPORT-LOG-HELPER-V16
+def _angio_log_exportacion_caso_v16(db, request, procedimiento_id, tipo_exportacion):
+    """
+    Registra exportación en auditoría/actividad del caso.
+    Usa el helper V11 si existe, porque ya alimenta Actividad del caso.
+    """
+    try:
+        fn = globals().get("_angio_registrar_actividad_caso_v11")
+        if callable(fn):
+            return fn(
+                db=db,
+                request=request,
+                procedimiento_id=procedimiento_id,
+                accion="FICHA_EXPORTED",
+                tarea="exportacion",
+                estado="ok",
+                detalle=f"procedimiento_id={procedimiento_id}; caso_exportado; tipo={tipo_exportacion}",
+            )
+    except Exception:
+        return False
+
+    return False
+
+
 @router.get("/procedimientos/{procedimiento_id}/exportar-completo")
 def exportar_procedimiento_completo_zip(
     procedimiento_id: int,
+    request: Request,
     db: Session = Depends(get_db),
 ):
     procedimiento = db.query(Procedimiento).filter(Procedimiento.id == procedimiento_id).first()
@@ -3477,6 +3584,22 @@ def exportar_procedimiento_completo_zip(
 
         zipf.writestr("manifest_complete.json", json.dumps(manifest, ensure_ascii=False, indent=2))
 
+    # ANGIO-LOG-EXPORT-COMPLETO-V16
+    _angio_log_exportacion_caso_v16(
+        db=db,
+        request=request,
+        procedimiento_id=procedimiento_id,
+        tipo_exportacion="exportar_completo",
+    )
+
+    # ANGIO-LOG-EXPORT-COMPLETO-V21
+    angio_v21_log_exportacion_caso(
+        db=db,
+        request=request,
+        procedimiento_id=procedimiento_id,
+        tipo_exportacion="exportar_completo",
+    )
+
     return FileResponse(
         path=zip_path,
         filename=zip_path.name,
@@ -3639,6 +3762,18 @@ def _angio_043_unlink_archivo_seguro(ruta_str: str | None):
 
     except Exception:
         return False
+
+    # ANGIO-LOG-EXPORT-COMPLETO-V15
+    if "_angio_registrar_actividad_caso_v11" in globals():
+        _angio_registrar_actividad_caso_v11(
+            db=db,
+            request=request,
+            procedimiento_id=procedimiento_id,
+            accion="FICHA_EXPORTED",
+            tarea="exportacion",
+            estado="ok",
+            detalle=f"procedimiento_id={procedimiento_id}; caso_exportado; tipo=exportar_completo",
+        )
 
     return False
 

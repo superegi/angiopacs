@@ -186,84 +186,226 @@ def etiqueta_tipo_procedimiento(valor: str | None) -> str:
     return mapa.get(valor, str(valor).replace("_", " ").strip())
 
 
-def construir_resumen_procedimiento(p: Procedimiento) -> dict:
-    """
-    Construye una representación estable para el listado principal.
 
-    Fuente oficial:
-    - paciente: paciente_nombre + paciente_apellido
-    - institución: institucion; fallback legacy lugar
-    - operadores: participantes_procedimiento; fallback legacy primer_operador/segundo_operador/fellow
-    """
+# ANGIO-LISTADO-HELPERS-V21
+def angio_v21_estado_label(valor: str | None) -> str:
+    mapa = {
+        "abierto": "Abierto",
+        "hospitalizado": "Está hospitalizado",
+        "esta_hospitalizado": "Está hospitalizado",
+        "pendiente_control_ambulatorio": "Pendiente control ambulatorio",
+        "cerrado": "Cerrado",
+    }
+    return mapa.get(valor or "", valor or "Abierto")
 
-    paciente = " ".join(
-        parte.strip()
-        for parte in [
-            p.paciente_nombre or "",
-            p.paciente_apellido or "",
-        ]
-        if parte and parte.strip()
-    ).strip() or "Sin nombre"
 
-    institucion = (p.institucion or p.lugar or "").strip()
+def angio_v21_tipo_procedimiento_label(valor: str | None) -> str:
+    if not valor:
+        return ""
 
-    roles_operador = {
-        "primer_operador",
-        "1er_operador",
-        "1°_operador",
-        "segundo_operador",
-        "2do_operador",
-        "2°_operador",
-        "tercer_operador",
-        "3er_operador",
-        "3°_operador",
-        "cuarto_operador",
-        "4to_operador",
-        "4°_operador",
-        "fellow",
+    mapa = {
+        "angiografia_cerebral": "Angiografía cerebral",
+        "angiografia_medular": "Angiografía medular",
+        "test_wada": "Test de WADA",
+        "test_oclusion_balon": "Test de oclusión con balón",
+        "muestreo_senos_petrosos": "Muestreo de senos petrosos",
+        "trombectomia_mecanica": "Trombectomía mecánica",
+        "angioplastia_stenting_carotideo": "Angioplastia / stenting carotídeo",
+        "trombolisis_intraarterial": "Trombólisis intraarterial",
+        "coiling_simple": "Coiling simple",
+        "coiling_asistido": "Coiling asistido",
+        "divertor_flujo": "Divertor de flujo",
+        "dispositivo_intrasacular": "Dispositivo intrasacular",
+        "embolizacion_mav": "Embolización MAV",
+        "embolizacion_favd": "Embolización FAVd",
+        "malformacion_vena_galeno": "Malformación vena de Galeno",
+        "stenting_senos_venosos": "Stenting senos venosos",
+        "trombectomia_fibrinolisis_venosa": "Trombectomía / fibrinólisis venosa",
+        "embolizacion_tumor": "Embolización tumoral",
+        "embolizacion_epistaxis": "Embolización epistaxis",
+        "escleroterapia_cabeza_cuello": "Escleroterapia cabeza/cuello",
+        "vertebroplastia_cifoplastia": "Vertebroplastia / cifoplastia",
+        "infiltracion_bloqueo_raquis": "Infiltración / bloqueo raquídeo",
+        "tratamiento_fuga_lcr": "Tratamiento fuga LCR",
+        "otro": "Otro",
     }
 
-    operadores = []
+    return mapa.get(valor, str(valor).replace("_", " ").strip())
 
-    for participante in p.participantes or []:
-        rol_norm = normalizar_rol(participante.rol)
 
-        if rol_norm in roles_operador:
-            operadores.append({
-                "rol": etiqueta_rol(participante.rol),
-                "nombre": participante.nombre,
-            })
+def angio_v21_rol_label(valor: str | None) -> str:
+    if not valor:
+        return "Participante"
 
-    # Fallback legacy solo si no hay participantes estructurados tipo operador/fellow.
-    if not operadores:
-        if p.primer_operador:
-            operadores.append({"rol": "1° operador", "nombre": p.primer_operador})
-        if p.segundo_operador:
-            operadores.append({"rol": "2° operador", "nombre": p.segundo_operador})
-        if p.fellow:
-            operadores.append({"rol": "Fellow", "nombre": p.fellow})
-
-    tiene_archivos = bool(p.archivos)
-    tiene_dicom = bool(
-        p.estudios_dicom
-        or p.dicom_orthanc_id
-        or p.study_instance_uid
+    txt = str(valor).strip()
+    norm = (
+        txt.lower()
+        .replace(" ", "_")
+        .replace("-", "_")
+        .replace("°", "")
     )
+
+    mapa = {
+        "primer_operador": "1er operador",
+        "1er_operador": "1er operador",
+        "1_operador": "1er operador",
+        "segundo_operador": "2do operador",
+        "2do_operador": "2do operador",
+        "2_operador": "2do operador",
+        "tercer_operador": "3er operador",
+        "3er_operador": "3er operador",
+        "3_operador": "3er operador",
+        "cuarto_operador": "4to operador",
+        "4to_operador": "4to operador",
+        "4_operador": "4to operador",
+        "fellow": "Fellow",
+        "asistente": "Asistente",
+        "anestesia": "Anestesia",
+    }
+
+    return mapa.get(norm, txt)
+
+
+def angio_v21_es_operador(valor: str | None) -> bool:
+    if not valor:
+        return False
+
+    norm = str(valor).strip().lower().replace(" ", "_").replace("-", "_")
+    return "operador" in norm or norm in {"fellow", "asistente", "anestesia"}
+
+
+
+
+# ANGIO-LISTADO-OPERADORES-V22
+def angio_v22_estado_label(valor: str | None) -> str:
+    mapa = {
+        "abierto": "Abierto",
+        "hospitalizado": "Está hospitalizado",
+        "esta_hospitalizado": "Está hospitalizado",
+        "pendiente_control_ambulatorio": "Pendiente control ambulatorio",
+        "cerrado": "Cerrado",
+    }
+    return mapa.get(valor or "", valor or "Abierto")
+
+
+def angio_v22_tipo_procedimiento_label(valor: str | None) -> str:
+    if not valor:
+        return ""
+
+    mapa = {
+        "angiografia_cerebral": "Angiografía cerebral",
+        "angiografia_medular": "Angiografía medular",
+        "test_wada": "Test de WADA",
+        "test_oclusion_balon": "Test de oclusión con balón",
+        "muestreo_senos_petrosos": "Muestreo de senos petrosos",
+        "trombectomia_mecanica": "Trombectomía mecánica",
+        "angioplastia_stenting_carotideo": "Angioplastia / stenting carotídeo",
+        "trombolisis_intraarterial": "Trombólisis intraarterial",
+        "coiling_simple": "Coiling simple",
+        "coiling_asistido": "Coiling asistido",
+        "divertor_flujo": "Divertor de flujo",
+        "dispositivo_intrasacular": "Dispositivo intrasacular",
+        "embolizacion_mav": "Embolización MAV",
+        "embolizacion_favd": "Embolización FAVd",
+        "malformacion_vena_galeno": "Malformación vena de Galeno",
+        "stenting_senos_venosos": "Stenting senos venosos",
+        "trombectomia_fibrinolisis_venosa": "Trombectomía / fibrinólisis venosa",
+        "embolizacion_tumor": "Embolización tumoral",
+        "embolizacion_epistaxis": "Embolización epistaxis",
+        "escleroterapia_cabeza_cuello": "Escleroterapia cabeza/cuello",
+        "vertebroplastia_cifoplastia": "Vertebroplastia / cifoplastia",
+        "infiltracion_bloqueo_raquis": "Infiltración / bloqueo raquídeo",
+        "tratamiento_fuga_lcr": "Tratamiento fuga LCR",
+        "otro": "Otro",
+    }
+    return mapa.get(valor, str(valor).replace("_", " ").strip())
+
+
+def angio_v22_es_operador(valor: str | None) -> bool:
+    if not valor:
+        return False
+
+    normalizado = str(valor).strip().lower().replace(" ", "_").replace("-", "_")
+    return "operador" in normalizado
+
+
+def angio_v22_split_paciente(p) -> tuple[str, str, str]:
+    nombre = (getattr(p, "paciente_nombre", None) or "").strip()
+    apellido = (getattr(p, "paciente_apellido", None) or "").strip()
+
+    if nombre or apellido:
+        completo = " ".join(x for x in [apellido, nombre] if x).strip()
+        return nombre, apellido, completo
+
+    legacy = (getattr(p, "paciente", None) or "").strip()
+    if legacy:
+        partes = legacy.split()
+        if len(partes) >= 2:
+            apellido = partes[-1]
+            nombre = " ".join(partes[:-1])
+            return nombre, apellido, legacy
+        return legacy, "", legacy
+
+    return "", "", "Sin nombre"
+
+
+def angio_v22_operadores_resumen(p) -> list[str]:
+    nombres = []
+    vistos = set()
+
+    participantes = list(getattr(p, "participantes", []) or [])
+    for participante in participantes:
+        rol = getattr(participante, "rol", None)
+        nombre = (getattr(participante, "nombre", None) or "").strip()
+
+        if not nombre:
+            continue
+
+        # Solo operadores. No fellow puro, no asistente, no anestesia.
+        if not angio_v22_es_operador(rol):
+            continue
+
+        clave = nombre.lower()
+        if clave in vistos:
+            continue
+
+        vistos.add(clave)
+        nombres.append(nombre)
+
+    # Fallback legacy si no hay participantes estructurados.
+    if not nombres:
+        for attr in ["primer_operador", "segundo_operador", "tercer_operador", "cuarto_operador"]:
+            nombre = (getattr(p, attr, None) or "").strip()
+            if nombre and nombre.lower() not in vistos:
+                vistos.add(nombre.lower())
+                nombres.append(nombre)
+
+    return nombres
+
+
+def construir_resumen_procedimiento(p: Procedimiento) -> dict:
+    paciente_nombre, paciente_apellido, paciente = angio_v22_split_paciente(p)
+    operadores_nombres = angio_v22_operadores_resumen(p)
+
+    tiene_archivos = bool(list(getattr(p, "archivos", []) or []))
 
     return {
         "id": p.id,
-        "fecha": p.fecha,
+        "fecha": getattr(p, "fecha", None),
+        "estado_caso": getattr(p, "estado_caso", None) or "abierto",
+        "estado_caso_label": angio_v22_estado_label(getattr(p, "estado_caso", None)),
         "paciente": paciente,
-        "historia_clinica": p.historia_clinica,
-        "institucion": institucion,
-        "tipo_procedimiento": p.tipo_procedimiento or "",
-        "tipo_procedimiento_label": etiqueta_tipo_procedimiento(p.tipo_procedimiento),
-        "procedimiento": p.procedimiento or "",
-        "diagnostico": p.diagnostico or "",
-        "operadores": operadores,
+        "paciente_nombre": paciente_nombre,
+        "paciente_apellido": paciente_apellido,
+        "historia_clinica": getattr(p, "historia_clinica", None) or "",
+        "institucion": getattr(p, "institucion", None) or "",
+        "operadores": [{"nombre": nombre} for nombre in operadores_nombres],
+        "operadores_nombres": operadores_nombres,
+        "tipo_procedimiento": getattr(p, "tipo_procedimiento", None) or "",
+        "tipo_procedimiento_label": angio_v22_tipo_procedimiento_label(getattr(p, "tipo_procedimiento", None)),
+        "procedimiento": getattr(p, "procedimiento", None) or "",
+        "diagnostico": getattr(p, "diagnostico", None) or "",
         "tiene_archivos": tiene_archivos,
-        "tiene_dicom": tiene_dicom,
-        "estado_caso": p.estado_caso or "abierto",
     }
 
 
@@ -535,6 +677,13 @@ def home(
                 Procedimiento.lugar.ilike(filtro_buscar),
                 Procedimiento.diagnostico.ilike(filtro_buscar),
                 Procedimiento.procedimiento.ilike(filtro_buscar),
+                Procedimiento.tipo_procedimiento.ilike(filtro_buscar),
+                Procedimiento.primer_operador.ilike(filtro_buscar),
+                Procedimiento.segundo_operador.ilike(filtro_buscar),
+                Procedimiento.fellow.ilike(filtro_buscar),
+                Procedimiento.operadores.ilike(filtro_buscar),
+                Procedimiento.participantes.any(ParticipanteProcedimiento.nombre.ilike(filtro_buscar)),
+                Procedimiento.participantes.any(ParticipanteProcedimiento.rol.ilike(filtro_buscar)),
             )
         )
 

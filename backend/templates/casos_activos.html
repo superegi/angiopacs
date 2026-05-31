@@ -60,27 +60,46 @@
                     <tr>
                         <td><a href="/procedimientos/{{ p.id }}">#{{ p.id }}</a></td>
                         <td>{{ p.fecha or "Sin fecha" }}</td>
+                        <td class="status-cell">
+                                    {% set estado_label = p.estado_caso_label or p.estado_caso or "Abierto" %}
+                                    <span class="status-pill status-{{ p.estado_caso or 'abierto' }} status-multiline">
+                                        {% if estado_label == "Pendiente control ambulatorio" %}
+                                            <span>Pendiente control</span>
+                                            <span>ambulatorio</span>
+                                        {% elif estado_label == "Está hospitalizado" %}
+                                            <span>Está</span>
+                                            <span>hospitalizado</span>
+                                        {% else %}
+                                            <span>{{ estado_label }}</span>
+                                        {% endif %}
+                                    </span>
+                                </td>
                         <td>
-                            <span class="status-pill status-{{ p.estado_caso or 'abierto' }}">
-                                {{ p.estado_caso or "abierto" }}
-                            </span>
-                        </td>
-                        <td>
-                            <a href="/procedimientos/{{ p.id }}">{{ p.paciente }}</a>
+                            <a href="/procedimientos/{{ p.id }}" class="patient-two-line">
+                                        {% if p.paciente_apellido %}
+                                            <span class="patient-lastname">{{ p.paciente_apellido }}</span>
+                                        {% endif %}
+                                        {% if p.paciente_nombre %}
+                                            <span class="patient-firstname">{{ p.paciente_nombre }}</span>
+                                        {% endif %}
+                                        {% if not p.paciente_apellido and not p.paciente_nombre %}
+                                            <span class="patient-lastname">Sin nombre</span>
+                                        {% endif %}
+                                    </a>
                             {% if p.historia_clinica %}
                                 <div class="small">HC: {{ p.historia_clinica }}</div>
                             {% endif %}
                         </td>
                         <td>{{ p.institucion or "Sin institución" }}</td>
-                        <td>
-                            {% if p.operadores %}
-                                {% for op in p.operadores %}
-                                    <div><span class="badge">{{ op.rol }}</span> {{ op.nombre }}</div>
-                                {% endfor %}
-                            {% else %}
-                                <span class="muted">Sin operadores</span>
-                            {% endif %}
-                        </td>
+                        <td class="operators-cell">
+                                    {% if p.operadores_nombres %}
+                                        {% for nombre in p.operadores_nombres %}
+                                            <div class="operator-name-only">{{ nombre }}</div>
+                                        {% endfor %}
+                                    {% else %}
+                                        <span class="muted">Sin operadores</span>
+                                    {% endif %}
+                                </td>
                         <td>{{ p.procedimiento or "Sin procedimiento" }}</td>
                         <td class="diagnosis-cell">{{ p.diagnostico or "Sin diagnóstico" }}</td>
                     </tr>

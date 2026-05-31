@@ -577,156 +577,156 @@ Complicaciones: {% if procedimiento.complicaciones_si_no %}{{ procedimiento.comp
         <button type="submit">Guardar Stroke</button>
     </form>
 
-<!-- ANGIO-OCLUSIONES-MULTIPLES-LIMPIO-V1 -->
-        <div id="stroke" class="occlusion-sites-box">
-            <h3>Sitios de oclusión</h3>
-            <p class="field-help">
-                Agrega uno o más sitios de oclusión. Cada sitio guarda lateralidad,
-                localización anatómica, método de recanalización y resultado TICI.
-            </p>
+<div class="stroke-subsection" id="sitios-oclusion">
+    <h3 class="section-subtitle">Sitios de oclusión</h3>
+    <!-- ANGIO-CARDS-DIRECTAS-V19 / SITIOS -->
 
-            {% if procedimiento.sitios_occlusion %}
-            <div class="occlusion-list">
+    <p class="small muted">
+        Agrega uno o más sitios de oclusión. Cada sitio guarda lateralidad, localización anatómica, método de recanalización y resultado TICI.
+    </p>
+
+    {% if procedimiento.sitios_occlusion %}
+    <div class="table-wrap compact-structured-wrap">
+        <table class="table compact-structured-table">
+            <thead>
+                <tr>
+                    <th>Lateralidad</th>
+                    <th>Sitio anatómico</th>
+                    <th>Método</th>
+                    <th>TICI</th>
+                    <th>Acción</th>
+                </tr>
+            </thead>
+            <tbody>
                 {% for sitio in procedimiento.sitios_occlusion %}
-                <div class="occlusion-item">
-                    <div>
-                        <b>{{ sitio.sitio_anatomico or "Sitio sin especificar" }}</b>
-                        <div class="small muted">
-                            Lateralidad: {{ sitio.lateralidad or "Sin especificar" }}
-                            · Método: {{ sitio.metodo_recanalizacion or "Sin especificar" }}
-                            · TICI: {{ sitio.tici or "Sin especificar" }}
-                        </div>
-                    </div>
-
-                    <form method="post" action="/procedimientos/{{ procedimiento.id }}/oclusiones/{{ sitio.id }}/eliminar" onsubmit="return confirm('¿Eliminar este sitio de oclusión?');">
-                        <button type="submit" class="btn btn-small btn-danger">Eliminar</button>
-                    </form>
-                </div>
+                <tr>
+                    <td>{{ sitio.lateralidad or "Sin especificar" }}</td>
+                    <td><strong>{{ sitio.sitio_anatomico or "Sin sitio" }}</strong></td>
+                    <td>{{ sitio.metodo_recanalizacion or "Sin especificar" }}</td>
+                    <td>{{ sitio.tici or "Sin especificar" }}</td>
+                    <td>
+                        <form method="post" action="/procedimientos/{{ procedimiento.id }}/oclusiones/{{ sitio.id }}/eliminar" onsubmit="return confirm('¿Eliminar sitio de oclusión?');">
+                            <button type="submit" class="btn btn-small btn-danger">Eliminar</button>
+                        </form>
+                    </td>
+                </tr>
                 {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+        <p class="small muted">Sin sitios de oclusión agregados.</p>
+    {% endif %}
+
+    <form method="post" action="/procedimientos/{{ procedimiento.id }}/oclusiones/agregar" class="structured-add-form">
+        <div class="four">
+            <div>
+                <label>Lateralidad</label>
+                <select name="lateralidad">
+                    <option value="">Sin especificar</option>
+                    <option value="izquierda">Izquierda</option>
+                    <option value="derecha">Derecha</option>
+                    <option value="bilateral">Bilateral</option>
+                </select>
             </div>
-            {% else %}
-            <p class="muted small">Sin sitios de oclusión agregados.</p>
-            {% endif %}
 
-            <form method="post" action="/procedimientos/{{ procedimiento.id }}/oclusiones/agregar" class="occlusion-add-form">
-                <div class="four">
-                    <div>
-                        <label>Lateralidad</label>
-                        <select name="lateralidad">
-                            <option value="">Sin especificar</option>
-                            <option value="izquierda">Izquierda</option>
-                            <option value="derecha">Derecha</option>
-                            <option value="ambas">Ambas</option>
-                        </select>
-                    </div>
+            <div>
+                <label>Sitio anatómico de oclusión</label>
+                <select name="sitio_anatomico">
+                    <option value="">Seleccionar opción frecuente</option>
+                    <option value="ACI cervical (C1): arteria carótida interna cervical">ACI cervical (C1)</option>
+                    <option value="ACI petroso (C2): arteria carótida interna petrosa">ACI petroso (C2)</option>
+                    <option value="ACI lacerum (C3): segmento lacerum">ACI lacerum (C3)</option>
+                    <option value="ACI cavernoso (C4): segmento cavernoso">ACI cavernoso (C4)</option>
+                    <option value="ACI clinoideo (C5): segmento clinoideo">ACI clinoideo (C5)</option>
+                    <option value="ACI oftálmico/supraclinoideo (C6)">ACI oftálmico / supraclinoideo (C6)</option>
+                    <option value="ACI comunicante/terminal (C7)">ACI comunicante / terminal (C7)</option>
+                    <option value="ACM M1: arteria cerebral media, segmento M1">ACM M1</option>
+                    <option value="ACM M2: arteria cerebral media, segmento M2">ACM M2</option>
+                    <option value="ACM M3: arteria cerebral media, segmento M3">ACM M3</option>
+                    <option value="ACM M4: arteria cerebral media, segmento M4">ACM M4</option>
+                    <option value="ACA A1">ACA A1</option>
+                    <option value="ACA A2">ACA A2</option>
+                    <option value="ACA A3">ACA A3</option>
+                    <option value="Arteria vertebral V1">Arteria vertebral V1</option>
+                    <option value="Arteria vertebral V2">Arteria vertebral V2</option>
+                    <option value="Arteria vertebral V3">Arteria vertebral V3</option>
+                    <option value="Arteria vertebral V4">Arteria vertebral V4</option>
+                    <option value="Basilar proximal">Basilar proximal</option>
+                    <option value="Basilar media">Basilar media</option>
+                    <option value="Basilar distal / top de la basilar">Basilar distal / top de la basilar</option>
+                    <option value="ACP P1">ACP P1</option>
+                    <option value="ACP P2">ACP P2</option>
+                    <option value="ACP P3">ACP P3</option>
+                    <option value="Otro">Otro</option>
+                </select>
+            </div>
 
-                    <div>
-                        <label>Sitio anatómico de oclusión</label>
-                        <select name="sitio_anatomico">
-                            <option value="">Seleccionar opción frecuente</option>
-                            <option value="ACI cervical (C1): arteria carótida interna cervical">ACI cervical (C1): arteria carótida interna cervical</option>
-                            <option value="ACI petroso (C2): arteria carótida interna petrosa">ACI petroso (C2): arteria carótida interna petrosa</option>
-                            <option value="ACI lacerum (C3): segmento lacerum de la ACI">ACI lacerum (C3): segmento lacerum de la ACI</option>
-                            <option value="ACI cavernoso (C4): arteria carótida interna cavernosa">ACI cavernoso (C4): arteria carótida interna cavernosa</option>
-                            <option value="ACI clinoideo (C5): arteria carótida interna clinoidea">ACI clinoideo (C5): arteria carótida interna clinoidea</option>
-                            <option value="ACI oftálmico / supraclinoideo (C6): origen de arteria oftálmica">ACI oftálmico / supraclinoideo (C6): origen de arteria oftálmica</option>
-                            <option value="ACI comunicante / terminal (C7): bifurcación carotídea terminal">ACI comunicante / terminal (C7): bifurcación carotídea terminal</option>
-                            <option value="ACM M1: arteria cerebral media, tronco principal">ACM M1: arteria cerebral media, tronco principal</option>
-                            <option value="ACM M2: arteria cerebral media, segmento insular">ACM M2: arteria cerebral media, segmento insular</option>
-                            <option value="ACM M3: arteria cerebral media, segmento opercular">ACM M3: arteria cerebral media, segmento opercular</option>
-                            <option value="ACM M4: arteria cerebral media, ramas corticales">ACM M4: arteria cerebral media, ramas corticales</option>
-                            <option value="ACA A1: arteria cerebral anterior precomunicante">ACA A1: arteria cerebral anterior precomunicante</option>
-                            <option value="ACoA: arteria comunicante anterior">ACoA: arteria comunicante anterior</option>
-                            <option value="ACA A2: arteria cerebral anterior postcomunicante">ACA A2: arteria cerebral anterior postcomunicante</option>
-                            <option value="ACA A3: arteria cerebral anterior supracallosa">ACA A3: arteria cerebral anterior supracallosa</option>
-                            <option value="ACA A4/A5: arteria cerebral anterior distal">ACA A4/A5: arteria cerebral anterior distal</option>
-                            <option value="AV V1: arteria vertebral extraforaminal">AV V1: arteria vertebral extraforaminal</option>
-                            <option value="AV V2: arteria vertebral foraminal">AV V2: arteria vertebral foraminal</option>
-                            <option value="AV V3: arteria vertebral atlantoaxial">AV V3: arteria vertebral atlantoaxial</option>
-                            <option value="AV V4: arteria vertebral intracraneal">AV V4: arteria vertebral intracraneal</option>
-                            <option value="PICA: arteria cerebelosa posteroinferior">PICA: arteria cerebelosa posteroinferior</option>
-                            <option value="Basilar proximal: tronco basilar proximal">Basilar proximal: tronco basilar proximal</option>
-                            <option value="Basilar media: tronco basilar medio">Basilar media: tronco basilar medio</option>
-                            <option value="Basilar distal / top: bifurcación terminal basilar">Basilar distal / top: bifurcación terminal basilar</option>
-                            <option value="AICA: arteria cerebelosa anteroinferior">AICA: arteria cerebelosa anteroinferior</option>
-                            <option value="SCA / SUCA: arteria cerebelosa superior">SCA / SUCA: arteria cerebelosa superior</option>
-                            <option value="ACP P1: arteria cerebral posterior precomunicante">ACP P1: arteria cerebral posterior precomunicante</option>
-                            <option value="ACoP: arteria comunicante posterior">ACoP: arteria comunicante posterior</option>
-                            <option value="ACP P2: arteria cerebral posterior ambiente/postcomunicante">ACP P2: arteria cerebral posterior ambiente/postcomunicante</option>
-                            <option value="ACP P3/P4: arteria cerebral posterior distal/cortical">ACP P3/P4: arteria cerebral posterior distal/cortical</option>
-                            <option value="Watershed anterior: frontera ACA-ACM">Watershed anterior: frontera ACA-ACM</option>
-                            <option value="Watershed posterior: frontera ACM-ACP">Watershed posterior: frontera ACM-ACP</option>
-                            <option value="Watershed profundo: frontera subcortical">Watershed profundo: frontera subcortical</option>
-                            <option value="Seno sagital superior: trombosis venosa">Seno sagital superior: trombosis venosa</option>
-                            <option value="Seno sagital inferior: trombosis venosa">Seno sagital inferior: trombosis venosa</option>
-                            <option value="Seno recto: trombosis venosa profunda">Seno recto: trombosis venosa profunda</option>
-                            <option value="Vena de Galeno: vena cerebral magna">Vena de Galeno: vena cerebral magna</option>
-                            <option value="Venas cerebrales internas: sistema venoso profundo">Venas cerebrales internas: sistema venoso profundo</option>
-                            <option value="Seno transverso derecho">Seno transverso derecho</option>
-                            <option value="Seno transverso izquierdo">Seno transverso izquierdo</option>
-                            <option value="Seno sigmoideo derecho">Seno sigmoideo derecho</option>
-                            <option value="Seno sigmoideo izquierdo">Seno sigmoideo izquierdo</option>
-                            <option value="Seno cavernoso">Seno cavernoso</option>
-                            <option value="Vena yugular interna">Vena yugular interna</option>
-                        </select>
-                    </div>
+            <div>
+                <label>Método recanalización</label>
+                <select name="metodo_recanalizacion">
+                    <option value="">Sin especificar</option>
+                    <option value="aspiracion">Aspiración</option>
+                    <option value="traccion">Tracción</option>
+                    <option value="ambos">Ambos</option>
+                </select>
+            </div>
 
-                    <div>
-                        <label>Método recanalización</label>
-                        <select name="metodo_recanalizacion">
-                            <option value="">Sin especificar</option>
-                            <option value="aspiracion">Aspiración</option>
-                            <option value="traccion">Tracción</option>
-                            <option value="ambos">Ambos</option>
-                        </select>
-                    </div>
-
-                    <div>
-                        <label>TICI</label>
-                        <select name="tici">
-                            <option value="">Sin especificar</option>
-                            <option value="0">0</option>
-                            <option value="1">1</option>
-                            <option value="2a">2a</option>
-                            <option value="2b">2b</option>
-                            <option value="3">3</option>
-                        </select>
-                    </div>
-                </div>
-
-                <button type="submit">Agregar sitio de oclusión</button>
-            </form>
+            <div>
+                <label>TICI</label>
+                <select name="tici">
+                    <option value="">Sin especificar</option>
+                    <option value="0">0</option>
+                    <option value="1">1</option>
+                    <option value="2a">2a</option>
+                    <option value="2b">2b</option>
+                    <option value="2c">2c</option>
+                    <option value="3">3</option>
+                </select>
+            </div>
         </div>
 
+        <button type="submit">Agregar sitio de oclusión</button>
+    </form>
+</div>
 
 </div>
 
-
 <div class="card" id="participantes">
     <h2 class="card-title">Participantes</h2>
-    <!-- ANGIO-PARTICIPANTES-FORCE-V3 -->
+    <!-- ANGIO-CARDS-DIRECTAS-V19 / PARTICIPANTES -->
 
     {% if procedimiento.participantes %}
-    <div class="structured-list">
-        {% for participante in procedimiento.participantes %}
-        <div class="structured-item">
-            <div>
-                <b>{{ participante.nombre or "Sin nombre" }}</b>
-                <div class="small muted">
-                    Rol: {{ participante.rol or "Sin especificar" }}
-                    · Fellow: {% if participante.es_fellow %}Sí{% else %}No{% endif %}
-                    {% if participante.notas %} · {{ participante.notas }}{% endif %}
-                </div>
-            </div>
-
-            <form method="post" action="/procedimientos/{{ procedimiento.id }}/participantes/{{ participante.id }}/eliminar" onsubmit="return confirm('¿Eliminar participante?');">
-                <button type="submit" class="btn btn-small btn-danger">Eliminar</button>
-            </form>
-        </div>
-        {% endfor %}
+    <div class="table-wrap compact-structured-wrap">
+        <table class="table compact-structured-table">
+            <thead>
+                <tr>
+                    <th>Nombre</th>
+                    <th>Rol</th>
+                    <th>Fellow</th>
+                    <th>Notas</th>
+                    <th>Acción</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for participante in procedimiento.participantes %}
+                <tr>
+                    <td><strong>{{ participante.nombre or "Sin nombre" }}</strong></td>
+                    <td>{{ participante.rol or "Sin especificar" }}</td>
+                    <td>{% if participante.es_fellow %}Sí{% else %}No{% endif %}</td>
+                    <td>{{ participante.notas or "" }}</td>
+                    <td>
+                        <form method="post" action="/procedimientos/{{ procedimiento.id }}/participantes/{{ participante.id }}/eliminar" onsubmit="return confirm('¿Eliminar participante?');">
+                            <button type="submit" class="btn btn-small btn-danger">Eliminar</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
     {% else %}
-    <p class="muted small">Sin participantes agregados.</p>
+        <p class="muted small">Sin participantes agregados.</p>
     {% endif %}
 
     <form method="post" action="/procedimientos/{{ procedimiento.id }}/participantes/agregar" class="structured-add-form">
@@ -745,6 +745,7 @@ Complicaciones: {% if procedimiento.complicaciones_si_no %}{{ procedimiento.comp
                     <option value="3er operador">3er operador</option>
                     <option value="4to operador">4to operador</option>
                     <option value="Asistente">Asistente</option>
+                    <option value="Anestesia">Anestesia</option>
                 </select>
             </div>
 
@@ -766,34 +767,43 @@ Complicaciones: {% if procedimiento.complicaciones_si_no %}{{ procedimiento.comp
     </form>
 </div>
 
-
-
 <div class="card" id="materiales">
     <h2 class="card-title">Materiales del procedimiento</h2>
-    <!-- ANGIO-MATERIALES-DEDICADOS-V4 -->
+    <!-- ANGIO-CARDS-DIRECTAS-V19 / MATERIALES -->
 
     {% if procedimiento.materiales_procedimiento %}
-    <div class="structured-list">
-        {% for material in procedimiento.materiales_procedimiento %}
-        <div class="structured-item">
-            <div>
-                <b>{{ material.nombre or "Material sin nombre" }}</b>
-                <div class="small muted">
-                    Tipo: {{ material.tipo or "Sin especificar" }}
-                    · Tamaño: {{ material.tamano or "Sin especificar" }}
-                    · Marca: {{ material.marca or "Sin especificar" }}
-                    {% if material.notas %} · {{ material.notas }}{% endif %}
-                </div>
-            </div>
-
-            <form method="post" action="/procedimientos/{{ procedimiento.id }}/materiales/{{ material.id }}/eliminar" onsubmit="return confirm('¿Eliminar material?');">
-                <button type="submit" class="btn btn-small btn-danger">Eliminar</button>
-            </form>
-        </div>
-        {% endfor %}
+    <div class="table-wrap compact-structured-wrap">
+        <table class="table compact-structured-table">
+            <thead>
+                <tr>
+                    <th>Tipo</th>
+                    <th>Nombre</th>
+                    <th>Tamaño</th>
+                    <th>Marca</th>
+                    <th>Notas</th>
+                    <th>Acción</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for material in procedimiento.materiales_procedimiento %}
+                <tr>
+                    <td>{{ material.tipo or "Sin especificar" }}</td>
+                    <td><strong>{{ material.nombre or "Material sin nombre" }}</strong></td>
+                    <td>{{ material.tamano or "" }}</td>
+                    <td>{{ material.marca or "" }}</td>
+                    <td>{{ material.notas or "" }}</td>
+                    <td>
+                        <form method="post" action="/procedimientos/{{ procedimiento.id }}/materiales/{{ material.id }}/eliminar" onsubmit="return confirm('¿Eliminar material?');">
+                            <button type="submit" class="btn btn-small btn-danger">Eliminar</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
     {% else %}
-    <p class="muted small">Sin materiales agregados.</p>
+        <p class="muted small">Sin materiales agregados.</p>
     {% endif %}
 
     <form method="post" action="/procedimientos/{{ procedimiento.id }}/materiales/agregar" class="structured-add-form">

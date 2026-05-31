@@ -2874,3 +2874,488 @@ button:hover {
   background: rgba(255, 255, 255, 0.72);
   font-weight: 800;
 }
+
+/* =========================================================
+   ANGIO-TABLAS-COMPACTAS-FICHA-V15
+   Tablas compactas para elementos agregables de la ficha
+   ========================================================= */
+
+.compact-structured-wrap {
+  margin: 10px 0 14px;
+  overflow-x: auto;
+}
+
+.compact-structured-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  overflow: hidden;
+  border-radius: 14px;
+  border: 1px solid rgba(16, 32, 51, 0.14);
+  background: rgba(255, 255, 255, 0.58);
+}
+
+.compact-structured-table th,
+.compact-structured-table td {
+  padding: 9px 11px;
+  border-bottom: 1px solid rgba(16, 32, 51, 0.10);
+  text-align: left;
+  vertical-align: top;
+  font-size: 0.92rem;
+}
+
+.compact-structured-table th {
+  background: rgba(207, 234, 243, 0.80);
+  font-weight: 900;
+}
+
+.compact-structured-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.compact-structured-table form {
+  margin: 0;
+}
+
+.compact-structured-table .btn-small,
+.compact-structured-table button.btn-small {
+  padding: 6px 10px !important;
+  min-height: auto !important;
+  line-height: 1.1;
+}
+
+@media (max-width: 760px) {
+  .compact-structured-table {
+    min-width: 640px;
+  }
+}
+
+/* =========================================================
+   ANGIO-CARD-HIERARCHY-FIX-V18
+   Tarjetas independientes dentro de ficha clínica
+   ========================================================= */
+
+#sitios-oclusion,
+#participantes,
+#materiales {
+  clear: both;
+}
+
+.compact-structured-wrap {
+  width: 100%;
+  overflow-x: auto;
+  margin: 10px 0 14px;
+}
+
+.compact-structured-table {
+  width: 100%;
+  min-width: 640px;
+}
+
+.compact-structured-table th,
+.compact-structured-table td {
+  vertical-align: top;
+}
+
+@media (max-width: 760px) {
+  .compact-structured-table {
+    min-width: 620px;
+  }
+}
+
+/* =========================================================
+   ANGIO-CARDS-DIRECTAS-V19
+   Cards independientes para Stroke, oclusiones, participantes y materiales
+   ========================================================= */
+
+#sitios-oclusion,
+#participantes,
+#materiales {
+  clear: both;
+}
+
+.compact-structured-wrap {
+  width: 100%;
+  overflow-x: auto;
+  margin: 10px 0 14px;
+}
+
+.compact-structured-table {
+  width: 100%;
+  min-width: 640px;
+}
+
+.compact-structured-table th,
+.compact-structured-table td {
+  vertical-align: top;
+}
+
+/* =========================================================
+   ANGIO-SITIOS-DENTRO-STROKE-V20
+   Sitios de oclusión como subsección interna de Stroke
+   ========================================================= */
+
+.stroke-subsection {
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(16, 32, 51, 0.14);
+}
+
+.stroke-subsection .section-subtitle {
+  margin: 0 0 10px;
+  font-size: 1.15rem;
+  font-weight: 900;
+  color: var(--ink, #102033);
+}
+
+.stroke-subsection .compact-structured-wrap {
+  margin-top: 12px;
+}
+
+.stroke-subsection form.structured-add-form {
+  margin-top: 10px;
+}
+
+/* =========================================================
+   ANGIO-LISTADO-TABLA-V21
+   Listado principal: columnas, paciente y grupo procedimiento
+   ========================================================= */
+
+.clinical-table th,
+.clinical-table td {
+  vertical-align: top;
+}
+
+.clinical-table th:nth-child(2),
+.clinical-table td:nth-child(2) {
+  width: 92px;
+  min-width: 92px;
+  white-space: nowrap;
+}
+
+.clinical-table th:nth-child(3),
+.clinical-table td:nth-child(3) {
+  width: 150px;
+  min-width: 150px;
+}
+
+.clinical-table th:nth-child(4),
+.clinical-table td:nth-child(4),
+.patient-cell {
+  width: 150px;
+  min-width: 150px;
+}
+
+.patient-two-line {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+  line-height: 1.12;
+}
+
+.patient-lastname {
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.patient-firstname {
+  font-weight: 700;
+  text-transform: none;
+}
+
+.clinical-table .col-procedure-group,
+.clinical-table .procedure-group-cell,
+.procedure-group-cell {
+  width: 150px;
+  min-width: 130px;
+  max-width: 170px;
+  white-space: normal !important;
+  overflow-wrap: anywhere;
+  word-break: normal;
+  line-height: 1.25;
+}
+
+.clinical-table th:nth-child(6),
+.clinical-table td:nth-child(6) {
+  min-width: 150px;
+}
+
+.clinical-table th:nth-child(8),
+.clinical-table td:nth-child(8) {
+  min-width: 130px;
+}
+
+@media (max-width: 760px) {
+  .clinical-table .procedure-group-cell,
+  .procedure-group-cell {
+    max-width: none;
+  }
+
+  .patient-two-line {
+    min-width: 110px;
+  }
+}
+
+/* =========================================================
+   ANGIO-LISTADO-OPERADORES-V22
+   Optimización columnas listado principal
+   ========================================================= */
+
+.clinical-table th,
+.clinical-table td {
+  vertical-align: top;
+}
+
+.clinical-table th {
+  white-space: normal;
+  line-height: 1.15;
+}
+
+.clinical-table th:nth-child(2),
+.clinical-table td:nth-child(2) {
+  width: 86px;
+  min-width: 86px;
+  white-space: nowrap;
+}
+
+.clinical-table th:nth-child(3),
+.clinical-table td:nth-child(3) {
+  width: 126px;
+  min-width: 126px;
+  max-width: 138px;
+  white-space: normal !important;
+  overflow-wrap: normal;
+  line-height: 1.2;
+}
+
+.clinical-table th:nth-child(4),
+.clinical-table td:nth-child(4) {
+  width: 145px;
+  min-width: 145px;
+  max-width: 155px;
+}
+
+.patient-two-line {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+  line-height: 1.1;
+}
+
+.patient-lastname {
+  display: block;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.patient-firstname {
+  display: block;
+  font-weight: 700;
+  text-transform: none;
+}
+
+.operators-cell {
+  width: 128px;
+  min-width: 128px;
+  max-width: 145px;
+  white-space: normal !important;
+}
+
+.operator-name-only {
+  display: block;
+  font-weight: 700;
+  line-height: 1.15;
+  margin-bottom: 3px;
+}
+
+.clinical-table .col-procedure-group,
+.clinical-table .procedure-group-cell,
+.procedure-group-cell {
+  width: 138px;
+  min-width: 120px;
+  max-width: 145px;
+  white-space: normal !important;
+  overflow-wrap: anywhere;
+  word-break: normal;
+  line-height: 1.18;
+}
+
+.clinical-table th:nth-child(8),
+.clinical-table td:nth-child(8) {
+  min-width: 130px;
+}
+
+@media (max-width: 760px) {
+  .clinical-table th:nth-child(3),
+  .clinical-table td:nth-child(3),
+  .clinical-table .procedure-group-cell,
+  .procedure-group-cell,
+  .operators-cell {
+    max-width: none;
+  }
+}
+
+/* =========================================================
+   ANGIO-FIX-LISTADO-VISIBLE-V23
+   Forzar visual de listado: paciente, estado, operadores y grupo
+   ========================================================= */
+
+.clinical-table th,
+.clinical-table td {
+  vertical-align: top !important;
+}
+
+.clinical-table th {
+  white-space: normal !important;
+  line-height: 1.12 !important;
+}
+
+.clinical-table th:nth-child(2),
+.clinical-table td:nth-child(2) {
+  width: 84px !important;
+  min-width: 84px !important;
+  white-space: nowrap !important;
+}
+
+.clinical-table th:nth-child(3),
+.clinical-table td:nth-child(3) {
+  width: 128px !important;
+  min-width: 118px !important;
+  max-width: 138px !important;
+  white-space: normal !important;
+  overflow-wrap: normal !important;
+  line-height: 1.18 !important;
+}
+
+.patient-two-line {
+  display: block !important;
+  line-height: 1.08 !important;
+}
+
+.patient-two-line span {
+  display: block !important;
+}
+
+.patient-lastname {
+  display: block !important;
+  font-weight: 900 !important;
+  text-transform: uppercase !important;
+}
+
+.patient-firstname {
+  display: block !important;
+  font-weight: 700 !important;
+  text-transform: none !important;
+}
+
+.operators-cell {
+  width: 130px !important;
+  min-width: 120px !important;
+  max-width: 145px !important;
+  white-space: normal !important;
+}
+
+.operator-name-only {
+  display: block !important;
+  font-weight: 700 !important;
+  line-height: 1.12 !important;
+  margin-bottom: 3px !important;
+}
+
+.col-procedure-group,
+.procedure-group-cell {
+  width: 135px !important;
+  min-width: 118px !important;
+  max-width: 145px !important;
+  white-space: normal !important;
+  overflow-wrap: anywhere !important;
+  word-break: normal !important;
+  line-height: 1.15 !important;
+}
+
+/* =========================================================
+   ANGIO-FIX-OPERADORES-LISTADO-V24
+   Operadores visibles como nombres simples en listado principal
+   ========================================================= */
+
+.clinical-table .operators-cell {
+  width: 130px !important;
+  min-width: 120px !important;
+  max-width: 150px !important;
+  white-space: normal !important;
+  line-height: 1.15 !important;
+}
+
+.clinical-table .operator-name-only {
+  display: block !important;
+  font-weight: 800 !important;
+  line-height: 1.12 !important;
+  margin-bottom: 4px !important;
+}
+
+.clinical-table .procedure-group-cell,
+.clinical-table .col-procedure-group {
+  white-space: normal !important;
+  overflow-wrap: anywhere !important;
+  line-height: 1.15 !important;
+}
+
+.clinical-table .patient-two-line span {
+  display: block !important;
+}
+
+.clinical-table td:nth-child(3) {
+  white-space: normal !important;
+  overflow-wrap: normal !important;
+  line-height: 1.18 !important;
+}
+
+/* =========================================================
+   ANGIO-ESTADO-PACIENTE-V25
+   Salto de línea en Estado y Paciente del listado
+   ========================================================= */
+
+.clinical-table .status-cell {
+  width: 122px !important;
+  min-width: 112px !important;
+  max-width: 132px !important;
+  white-space: normal !important;
+  line-height: 1.1 !important;
+}
+
+.clinical-table .status-multiline {
+  display: inline-flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  gap: 1px !important;
+  white-space: normal !important;
+  line-height: 1.05 !important;
+  max-width: 118px !important;
+}
+
+.clinical-table .status-multiline span {
+  display: block !important;
+  white-space: normal !important;
+}
+
+.clinical-table .patient-two-line {
+  display: inline-flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  gap: 1px !important;
+  line-height: 1.05 !important;
+  white-space: normal !important;
+}
+
+.clinical-table .patient-two-line span {
+  display: block !important;
+}
+
+.clinical-table .patient-lastname {
+  font-weight: 900 !important;
+  text-transform: uppercase !important;
+}
+
+.clinical-table .patient-firstname {
+  font-weight: 700 !important;
+}
