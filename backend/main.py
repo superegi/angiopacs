@@ -133,14 +133,57 @@ def etiqueta_rol(rol: str | None) -> str:
 
     mapa = {
         "primer_operador": "1° operador",
+        "1er_operador": "1° operador",
+        "1°_operador": "1° operador",
         "segundo_operador": "2° operador",
+        "2do_operador": "2° operador",
+        "2°_operador": "2° operador",
         "tercer_operador": "3° operador",
+        "3er_operador": "3° operador",
+        "3°_operador": "3° operador",
         "cuarto_operador": "4° operador",
+        "4to_operador": "4° operador",
+        "4°_operador": "4° operador",
         "fellow": "Fellow",
         "anestesia": "Anestesia",
     }
 
     return mapa.get(rol_norm, rol or "")
+
+
+
+def etiqueta_tipo_procedimiento(valor: str | None) -> str:
+    if not valor:
+        return ""
+
+    mapa = {
+        "angiografia_cerebral": "Angiografía cerebral",
+        "angiografia_medular": "Angiografía medular",
+        "test_wada": "Test de WADA",
+        "test_oclusion_balon": "Test de oclusión con balón",
+        "muestreo_senos_petrosos": "Muestreo de senos petrosos",
+        "trombectomia_mecanica": "Trombectomía mecánica",
+        "angioplastia_stenting_carotideo": "Angioplastia / stenting carotídeo",
+        "trombolisis_intraarterial": "Trombólisis intraarterial",
+        "coiling_simple": "Coiling simple",
+        "coiling_asistido": "Coiling asistido",
+        "divertor_flujo": "Divertor de flujo",
+        "dispositivo_intrasacular": "Dispositivo intrasacular",
+        "embolizacion_mav": "Embolización de MAV",
+        "embolizacion_favd": "Embolización de FAVd",
+        "malformacion_vena_galeno": "Malformación vena de Galeno",
+        "stenting_senos_venosos": "Stenting senos venosos",
+        "trombectomia_fibrinolisis_venosa": "Trombectomía / fibrinólisis venosa",
+        "embolizacion_tumor": "Embolización tumoral",
+        "embolizacion_epistaxis": "Embolización epistaxis",
+        "escleroterapia_cabeza_cuello": "Escleroterapia cabeza/cuello",
+        "vertebroplastia_cifoplastia": "Vertebroplastia / cifoplastia",
+        "infiltracion_bloqueo_raquis": "Infiltración / bloqueo raquídeo",
+        "tratamiento_fuga_lcr": "Tratamiento fuga LCR",
+        "otro": "Otro",
+    }
+
+    return mapa.get(valor, str(valor).replace("_", " ").strip())
 
 
 def construir_resumen_procedimiento(p: Procedimiento) -> dict:
@@ -166,9 +209,17 @@ def construir_resumen_procedimiento(p: Procedimiento) -> dict:
 
     roles_operador = {
         "primer_operador",
+        "1er_operador",
+        "1°_operador",
         "segundo_operador",
+        "2do_operador",
+        "2°_operador",
         "tercer_operador",
+        "3er_operador",
+        "3°_operador",
         "cuarto_operador",
+        "4to_operador",
+        "4°_operador",
         "fellow",
     }
 
@@ -205,6 +256,8 @@ def construir_resumen_procedimiento(p: Procedimiento) -> dict:
         "paciente": paciente,
         "historia_clinica": p.historia_clinica,
         "institucion": institucion,
+        "tipo_procedimiento": p.tipo_procedimiento or "",
+        "tipo_procedimiento_label": etiqueta_tipo_procedimiento(p.tipo_procedimiento),
         "procedimiento": p.procedimiento or "",
         "diagnostico": p.diagnostico or "",
         "operadores": operadores,

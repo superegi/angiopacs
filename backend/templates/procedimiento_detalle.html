@@ -55,7 +55,7 @@ Obra social: {{ procedimiento.obra_social or "" }}
 Nombre del Paciente: {{ ((procedimiento.paciente_apellido or "") ~ " " ~ (procedimiento.paciente_nombre or ""))|trim }}
 Edad: {{ procedimiento.edad or "" }}
 Fecha: {{ procedimiento.fecha or "" }}
-Tipo procedimiento: {{ procedimiento.tipo_procedimiento or "" }}
+Gran tipo procedimiento: {{ procedimiento.tipo_procedimiento or "—" }}
 1er Operador: {{ datos.op1 or procedimiento.primer_operador or "" }}
 2do operador: {{ datos.op2 or procedimiento.segundo_operador or "" }}
 Fellow: {{ datos.fellow or procedimiento.fellow or "" }}
@@ -198,15 +198,17 @@ Complicaciones: {% if procedimiento.complicaciones_si_no %}{{ procedimiento.comp
 
     <div class="summary-operators">
         <b>Operadores:</b>
-        {% set ns = namespace(count=0) %}
-        {% for participante in participantes %}
-            {% if participante.rol in ["primer_operador", "segundo_operador", "tercer_operador", "cuarto_operador", "fellow"] %}
-                {% set ns.count = ns.count + 1 %}
-                <span class="operator-chip">{{ participante.rol }}: {{ participante.nombre }}</span>
-            {% endif %}
-        {% endfor %}
-        {% if ns.count == 0 %}
-            <span class="small">Sin operadores estructurados.</span>
+        {% set operadores_resumen = participantes | selectattr("rol", "in", ["1er operador", "2do operador", "3er operador", "4to operador", "primer_operador", "segundo_operador", "tercer_operador", "cuarto_operador"]) | list %}
+        {% if operadores_resumen %}
+            {% for participante in operadores_resumen %}
+                <span class="badge">{{ participante.rol }}</span> {{ participante.nombre }}{% if not loop.last %} · {% endif %}
+            {% endfor %}
+        {% elif participantes %}
+            {% for participante in participantes %}
+                <span class="badge">{{ participante.rol or "participante" }}</span> {{ participante.nombre }}{% if not loop.last %} · {% endif %}
+            {% endfor %}
+        {% else %}
+            <span class="muted">Sin operadores estructurados.</span>
         {% endif %}
     </div>
 </div>
@@ -1239,58 +1241,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
 
-<!-- ANGIO-STROKE-TIEMPO-JS-V1 -->
-<script>
-(function () {
-    function calcularMinutos() {
-        const puncion = document.getElementById("acvHoraPuncion");
-        const recanalizacion = document.getElementById("acvHoraRecanalizacion");
-        const salida = document.getElementById("acvTiempoPuncionRecanalizacion");
-
-        if (!puncion || !recanalizacion || !salida) return;
-        if (!puncion.value || !recanalizacion.value) {
-            salida.value = "";
-            return;
-        }
-
-        const a = new Date(puncion.value);
-        const b = new Date(recanalizacion.value);
-
-        if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime())) {
-            salida.value = "";
-            return;
-        }
-
-        const minutos = Math.round((b.getTime() - a.getTime()) / 60000);
-
-        if (minutos < 0 || minutos > 1440) {
-            salida.value = "";
-            return;
-        }
-
-        salida.value = String(minutos);
-    }
-
-    document.addEventListener("DOMContentLoaded", function () {
-        const puncion = document.getElementById("acvHoraPuncion");
-        const recanalizacion = document.getElementById("acvHoraRecanalizacion");
-
-        if (puncion) {
-            puncion.addEventListener("input", calcularMinutos);
-            puncion.addEventListener("change", calcularMinutos);
-        }
-
-        if (recanalizacion) {
-            recanalizacion.addEventListener("input", calcularMinutos);
-            recanalizacion.addEventListener("change", calcularMinutos);
-        }
-
-        calcularMinutos();
-    });
-})();
-</script>
-
-
 <!-- ANGIO-STROKE-DATOS-CLINICOS-V2-JS -->
 <script>
 (function () {
@@ -1498,6 +1448,71 @@ document.addEventListener("DOMContentLoaded", function () {
         guardarScrollAntesDeSubmit();
         restaurarScroll();
     }
+})();
+</script>
+
+
+<!-- ANGIO-STROKE-TIEMPO-JS-V8 -->
+<script>
+(function () {
+    function parseDatetimeLocal(value) {
+        if (!value) return null;
+        const d = new Date(value);
+        if (Number.isNaN(d.getTime())) return null;
+        return d;
+    }
+
+    function actualizarTiempoPuncionRecanalizacion() {
+        const puncion = document.querySelector('[name="acv_hora_puncion"], #acvHoraPuncion');
+        const recanalizacion = document.querySelector('[name="acv_hora_recanalizacion"], #acvHoraRecanalizacion');
+        const salida = document.querySelector('#acvTiempoPuncionRecanalizacion');
+
+        if (!puncion || !recanalizacion || !salida) return;
+
+        const a = parseDatetimeLocal(puncion.value);
+        const b = parseDatetimeLocal(recanalizacion.value);
+
+        if (!a || !b) {
+            salida.value = "";
+            salida.placeholder = "Automático en minutos";
+            return;
+        }
+
+        const minutos = Math.round((b.getTime() - a.getTime()) / 60000);
+
+        if (minutos < 0 || minutos > 1440) {
+            salida.value = "";
+            salida.placeholder = "Revisar fechas";
+            return;
+        }
+
+        salida.value = String(minutos);
+    }
+
+    document.addEventListener("input", function (event) {
+        if (event.target && (
+            event.target.name === "acv_hora_puncion" ||
+            event.target.name === "acv_hora_recanalizacion" ||
+            event.target.id === "acvHoraPuncion" ||
+            event.target.id === "acvHoraRecanalizacion"
+        )) {
+            actualizarTiempoPuncionRecanalizacion();
+        }
+    });
+
+    document.addEventListener("change", function (event) {
+        if (event.target && (
+            event.target.name === "acv_hora_puncion" ||
+            event.target.name === "acv_hora_recanalizacion" ||
+            event.target.id === "acvHoraPuncion" ||
+            event.target.id === "acvHoraRecanalizacion"
+        )) {
+            actualizarTiempoPuncionRecanalizacion();
+        }
+    });
+
+    document.addEventListener("DOMContentLoaded", actualizarTiempoPuncionRecanalizacion);
+    window.actualizarTiempoPuncionRecanalizacion = actualizarTiempoPuncionRecanalizacion;
 })();
 </script>
 

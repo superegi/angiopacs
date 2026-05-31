@@ -143,6 +143,7 @@
                 </th>
                                 <th>Hospital / clínica</th>
                                 <th>Operadores</th>
+                                <th>Gran tipo</th>
                                 <th>Procedimiento</th>
                                 <th>Diagnóstico</th>
                                 <th>Fotos</th>
@@ -188,15 +189,31 @@
                                 </td>
 
                                 <td>
-                                    {% if p.operadores %}
-                                        {% for op in p.operadores %}
+                                    {% set operadores_tabla = p.participantes | selectattr("rol", "in", ["1er operador", "2do operador", "3er operador", "4to operador", "primer_operador", "segundo_operador", "tercer_operador", "cuarto_operador"]) | list %}
+                                    {% if operadores_tabla %}
+                                        {% for op in operadores_tabla %}
                                             <div>
                                                 <span class="badge">{{ op.rol }}</span>
                                                 {{ op.nombre }}
                                             </div>
                                         {% endfor %}
+                                    {% elif p.participantes %}
+                                        {% for op in p.participantes %}
+                                            <div>
+                                                <span class="badge">{{ op.rol or "participante" }}</span>
+                                                {{ op.nombre }}
+                                            </div>
+                                        {% endfor %}
                                     {% else %}
                                         <span class="muted">Sin operadores</span>
+                                    {% endif %}
+                                </td>
+
+                                <td>
+                                    {% if p.tipo_procedimiento %}
+                                        {{ p.tipo_procedimiento | replace("_", " ") }}
+                                    {% else %}
+                                        <span class="muted">Sin tipo</span>
                                     {% endif %}
                                 </td>
 

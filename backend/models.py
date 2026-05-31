@@ -112,11 +112,11 @@ class Procedimiento(Base):
     creado_en = Column(DateTime, default=datetime.utcnow)
     actualizado_en = Column(DateTime, default=datetime.utcnow)
 
-    materiales_procedimiento = relationship("MaterialProcedimiento", back_populates="procedimiento", cascade="all, delete-orphan")
+    materiales_procedimiento = relationship("MaterialProcedimiento", back_populates="procedimiento", cascade="all, delete-orphan", overlaps="materiales")
     sitios_occlusion = relationship("SitioOclusion", back_populates="procedimiento", cascade="all, delete-orphan")
     archivos = relationship("Archivo", back_populates="procedimiento", cascade="all, delete-orphan")
     participantes = relationship("ParticipanteProcedimiento", back_populates="procedimiento", cascade="all, delete-orphan")
-    materiales = relationship("MaterialProcedimiento", back_populates="procedimiento", cascade="all, delete-orphan")
+    materiales = relationship("MaterialProcedimiento", viewonly=True, overlaps="materiales_procedimiento,procedimiento")
     estudios_dicom = relationship("EstudioDICOM", back_populates="procedimiento")
     sugerencias_ia = relationship("SugerenciaIA", back_populates="procedimiento", cascade="all, delete-orphan")
 

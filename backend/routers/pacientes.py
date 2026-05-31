@@ -361,19 +361,160 @@ def _resumen_dicom_suelto_humano(eventos):
     )
 
 
-def obtener_log_humano_caso(db: Session, procedimiento_id: int, limite: int = 800):
+
+# ANGIO-CASE-LOG-VISIBLE-V10
+def _angio_extraer_detalle(detalle, clave):
+    texto = str(detalle or "")
+    for parte in texto.split(";"):
+        parte = parte.strip()
+        if parte.startswith(clave + "="):
+            return parte.split("=", 1)[1].strip()
+    return ""
+
+
+def _angio_evento_prefijo(e):
+    creado_en = getattr(e, "creado_en", None)
+    if creado_en:
+        try:
+            hora = creado_en.strftime("%Y-%m-%d %H:%M")
+        except Exception:
+            hora = str(creado_en)
+    else:
+        hora = "sin hora"
+
+    usuario = getattr(e, "usuario", None) or "usuario"
+    return f"{hora} | {usuario}"
+
+
+def _angio_nombre_seccion(tarea):
+    tarea = str(tarea or "")
+
+    mapa = {
+        "informacion_paciente": "información del paciente",
+        "identificacion_paciente": "información del paciente",
+        "datos_clinicos": "datos clínicos",
+        "procedimiento": "procedimiento",
+        "stroke": "Stroke",
+        "stroke_oclusiones": "sitios de oclusión",
+        "participantes": "participantes",
+        "materiales": "materiales",
+        "archivos": "archivos/fotos",
+        "exportacion": "exportación",
+        "ficha": "ficha del caso",
+    }
+
+    partes = []
+    for item in tarea.split("+"):
+        item = item.strip()
+        if item:
+            partes.append(mapa.get(item, item.replace("_", " ")))
+
+    return ", ".join(dict.fromkeys(partes)) if partes else "ficha del caso"
+
+
+def _angio_evento_a_linea_humana(e):
+    accion = getattr(e, "accion", "") or ""
+    tarea = getattr(e, "tarea", "") or ""
+    detalle = getattr(e, "detalle", "") or ""
+
+    prefijo = _angio_evento_prefijo(e)
+
+    if accion == "FICHA_UPDATED":
+        return f"{prefijo} ha actualizado '{_angio_nombre_seccion(tarea)}'"
+
+    if accion in ("FICHA_PARTICIPANTE_ADDED", "PARTICIPANTE_ADDED"):
+        nombre = _angio_extraer_detalle(detalle, "nombre")
+        return f"{prefijo} ha agregado participante" + (f": {nombre}" if nombre else "")
+
+    if accion in ("FICHA_PARTICIPANTE_DELETED", "PARTICIPANTE_DELETED"):
+        return f"{prefijo} ha eliminado participante"
+
+    if accion in ("FICHA_MATERIAL_ADDED", "MATERIAL_ADDED"):
+        nombre = _angio_extraer_detalle(detalle, "nombre")
+        return f"{prefijo} ha agregado material" + (f": {nombre}" if nombre else "")
+
+    if accion in ("FICHA_MATERIAL_DELETED", "MATERIAL_DELETED"):
+        return f"{prefijo} ha eliminado material"
+
+    if accion in ("FICHA_OCLUSION_ADDED", "OCLUSION_SITE_ADDED"):
+        sitio = _angio_extraer_detalle(detalle, "sitio") or _angio_extraer_detalle(detalle, "sitio_anatomico")
+        return f"{prefijo} ha agregado sitio de oclusión" + (f": {sitio}" if sitio else "")
+
+    if accion in ("FICHA_OCLUSION_DELETED", "OCLUSION_SITE_DELETED"):
+        return f"{prefijo} ha eliminado sitio de oclusión"
+
+    if accion in ("FICHA_EXPORTED", "CASE_EXPORTED", "EXPORT_CASE", "EXPORT_FULL_CASE"):
+        return f"{prefijo} ha exportado el caso"
+
+    if accion in ("UPLOAD_FILE", "FILE_UPLOADED", "ARCHIVO_UPLOADED"):
+        archivo = _angio_extraer_detalle(detalle, "archivo")
+        return f"{prefijo} ha subido archivo/foto" + (f": {archivo}" if archivo else "")
+
+    if accion in ("FICHA_ARCHIVO_DELETED", "FILE_DELETED", "ARCHIVO_DELETED"):
+        return f"{prefijo} ha eliminado archivo/foto"
+
+    if accion in ("FICHA_ARCHIVO_UPDATED", "FILE_METADATA_UPDATED"):
+        return f"{prefijo} ha actualizado archivo/foto"
+
+    return None
+
+
+def obtener_log_humano_caso(db: Session, procedimiento_id: int, limite: int = 500):
+    """
+    Log visible del caso.
+    Muestra acciones humanas relevantes asociadas al caso mediante auditoria_eventos.caso_id.
+    """
     acciones_relevantes = [
-        "CASE_IMPORTED",
-        "CASE_CREATED",
-        "CASE_UPDATED",
-        "ZIP_UPLOAD_SUMMARY",
-        "UPLOAD_FILE",
-        "FILE_DELETED",
-        "PARTICIPANT_ADDED",
-        "PARTICIPANT_DELETED",
+        "FICHA_UPDATED",
+        "FICHA_PARTICIPANTE_ADDED",
+        "FICHA_PARTICIPANTE_DELETED",
+        "FICHA_MATERIAL_ADDED",
+        "FICHA_MATERIAL_DELETED",
+        "FICHA_OCLUSION_ADDED",
+        "FICHA_OCLUSION_DELETED",
+        "FICHA_EXPORTED",
+        "FICHA_ARCHIVO_DELETED",
+        "FICHA_ARCHIVO_UPDATED",
+        "PARTICIPANTE_ADDED",
+        "PARTICIPANTE_DELETED",
         "MATERIAL_ADDED",
         "MATERIAL_DELETED",
+        "OCLUSION_SITE_ADDED",
+        "OCLUSION_SITE_DELETED",
+        "UPLOAD_FILE",
+        "FILE_UPLOADED",
+        "ARCHIVO_UPLOADED",
+        "FILE_DELETED",
+        "ARCHIVO_DELETED",
+        "FILE_METADATA_UPDATED",
+        "CASE_EXPORTED",
+        "EXPORT_CASE",
+        "EXPORT_FULL_CASE",
     ]
+
+    try:
+        eventos = (
+            db.query(AuditoriaEvento)
+            .filter(
+                AuditoriaEvento.caso_id == procedimiento_id,
+                AuditoriaEvento.accion.in_(acciones_relevantes),
+            )
+            .order_by(AuditoriaEvento.id.asc())
+            .limit(limite)
+            .all()
+        )
+    except Exception:
+        return []
+
+    lineas = []
+    for evento in eventos:
+        linea = _angio_evento_a_linea_humana(evento)
+        if linea:
+            lineas.append(linea)
+
+    return lineas[-limite:]
+
+
 
     eventos = (
         db.query(AuditoriaEvento)
@@ -936,6 +1077,30 @@ async def agregar_sitio_occlusion(
         db.add(item)
         db.commit()
 
+        # ANGIO-LOG-OCLUSION-ADD-V11
+        _angio_registrar_actividad_caso_v11(
+            db=db,
+            request=request,
+            procedimiento_id=procedimiento_id,
+            accion="FICHA_OCLUSION_ADDED",
+            tarea="stroke_oclusiones",
+            estado="ok",
+            detalle=f"procedimiento_id={procedimiento_id}; lateralidad={lateralidad or ''}; sitio={sitio_anatomico or ''}; metodo={metodo_recanalizacion or ''}; tici={tici or ''}",
+        )
+
+
+        # ANGIO-LOG-OCLUSION-ADD-V8
+        angio_registrar_evento_ficha(
+            db=db,
+            request=request,
+            procedimiento_id=procedimiento_id,
+            accion="FICHA_OCLUSION_ADDED",
+            tarea="stroke_oclusiones",
+            estado="ok",
+            detalle=f"procedimiento_id={procedimiento_id}; oclusion_agregada; lateralidad={lateralidad or ''}; sitio={sitio_anatomico or ''}; metodo={metodo_recanalizacion or ''}; tici={tici or ''}",
+        )
+
+
         try:
             registrar_auditoria(
                 db=db,
@@ -976,6 +1141,30 @@ async def eliminar_sitio_occlusion(
         db.delete(item)
         db.commit()
 
+        # ANGIO-LOG-OCLUSION-DELETE-V11
+        _angio_registrar_actividad_caso_v11(
+            db=db,
+            request=request,
+            procedimiento_id=procedimiento_id,
+            accion="FICHA_OCLUSION_DELETED",
+            tarea="stroke_oclusiones",
+            estado="ok",
+            detalle=f"procedimiento_id={procedimiento_id}; oclusion_id={oclusion_id}",
+        )
+
+
+        # ANGIO-LOG-OCLUSION-DELETE-V8
+        angio_registrar_evento_ficha(
+            db=db,
+            request=request,
+            procedimiento_id=procedimiento_id,
+            accion="FICHA_OCLUSION_DELETED",
+            tarea="stroke_oclusiones",
+            estado="ok",
+            detalle=f"procedimiento_id={procedimiento_id}; oclusion_eliminada; id={oclusion_id}",
+        )
+
+
         try:
             registrar_auditoria(
                 db=db,
@@ -995,6 +1184,413 @@ async def eliminar_sitio_occlusion(
 
 
 
+
+
+
+
+# ANGIO-STROKE-DATETIME-HELPERS-V6
+def parse_datetime_local_or_none(valor):
+    """
+    Convierte input HTML datetime-local a datetime naive.
+    Ejemplo esperado: 2026-05-31T21:49
+    """
+    if valor is None:
+        return None
+
+    texto = str(valor).strip()
+    if not texto:
+        return None
+
+    try:
+        return datetime.fromisoformat(texto)
+    except Exception:
+        return None
+
+
+def parse_int_or_none(valor):
+    if valor is None:
+        return None
+
+    texto = str(valor).strip()
+    if not texto:
+        return None
+
+    try:
+        return int(texto)
+    except ValueError:
+        return None
+
+
+def calcular_minutos_entre(inicio, fin):
+    if not inicio or not fin:
+        return None
+
+    try:
+        minutos = int((fin - inicio).total_seconds() // 60)
+    except Exception:
+        return None
+
+    if minutos < 0 or minutos > 24 * 60:
+        return None
+
+    return minutos
+
+
+
+
+# ANGIO-FICHA-LOGS-GLOBALES-V8
+def parse_datetime_local_or_none(valor):
+    """
+    Convierte input HTML datetime-local a datetime naive.
+    Ejemplo: 2026-05-31T21:49
+    """
+    if valor is None:
+        return None
+
+    texto = str(valor).strip()
+    if not texto:
+        return None
+
+    try:
+        return datetime.fromisoformat(texto)
+    except Exception:
+        return None
+
+
+def parse_int_or_none(valor):
+    if valor is None:
+        return None
+
+    texto = str(valor).strip()
+    if not texto:
+        return None
+
+    try:
+        return int(texto)
+    except ValueError:
+        return None
+
+
+def calcular_minutos_entre(inicio, fin):
+    if not inicio or not fin:
+        return None
+
+    try:
+        minutos = int((fin - inicio).total_seconds() // 60)
+    except Exception:
+        return None
+
+    if minutos < 0 or minutos > 24 * 60:
+        return None
+
+    return minutos
+
+
+def angio_clasificar_formulario_ficha(form_data):
+    keys = set(form_data.keys())
+
+    grupos = []
+
+    identificacion = {
+        "paciente_nombre",
+        "paciente_apellido",
+        "paciente_sexo",
+        "paciente_fecha_nacimiento",
+        "paciente_id",
+        "paciente_mail",
+        "paciente_telefono",
+        "obra_social",
+        "estado_caso",
+    }
+
+    procedimiento = {
+        "procedimiento_urgente",
+        "origen_paciente",
+        "fecha",
+        "institucion",
+        "tipo_procedimiento",
+        "procedimiento_txt",
+        "localizacion",
+        "diagnostico",
+        "complicaciones_si_no",
+        "complicaciones",
+        "radiacion_dosis",
+        "contraste_ml",
+    }
+
+    datos_clinicos = {
+        "presentacion_clinica",
+        "informe_procedimiento",
+        "indicaciones",
+        "proxima_visita_agendada",
+        "fecha_ingreso",
+        "fecha_alta",
+        "notas_adicionales",
+    }
+
+    if keys.intersection(identificacion):
+        grupos.append("identificacion_paciente")
+
+    if keys.intersection(procedimiento):
+        grupos.append("procedimiento")
+
+    if keys.intersection(datos_clinicos):
+        grupos.append("datos_clinicos")
+
+    if any(k.startswith("acv_") for k in keys):
+        grupos.append("stroke")
+
+    if not grupos:
+        grupos.append("ficha")
+
+    return "+".join(grupos)
+
+
+def angio_campos_visibles_formulario(form_data):
+    ocultar = {
+        "csrf_token",
+        "password",
+        "clave",
+    }
+
+    campos = []
+    for key in form_data.keys():
+        if key in ocultar:
+            continue
+        campos.append(str(key))
+
+    return ",".join(sorted(set(campos)))
+
+
+def angio_registrar_evento_ficha(
+    db,
+    request,
+    procedimiento_id,
+    accion,
+    tarea,
+    detalle,
+    estado="ok",
+):
+    """
+    Registra eventos clínicos de ficha en el sistema de auditoría/log.
+
+    Es defensivo: si cambia la firma de registrar_auditoria,
+    intenta variantes sin romper el flujo clínico.
+    """
+    fn = globals().get("registrar_auditoria")
+
+    if not callable(fn):
+        return False
+
+    intentos = [
+        lambda: fn(
+            db=db,
+            request=request,
+            accion=accion,
+            tarea=tarea,
+            estado=estado,
+            detalle=detalle,
+            procedimiento_id=procedimiento_id,
+        ),
+        lambda: fn(
+            db=db,
+            request=request,
+            accion=accion,
+            tarea=tarea,
+            estado=estado,
+            detalle=detalle,
+        ),
+        lambda: fn(db, request, accion, tarea, estado, detalle),
+    ]
+
+    for intento in intentos:
+        try:
+            intento()
+            return True
+        except TypeError:
+            continue
+        except Exception:
+            return False
+
+    return False
+
+
+def angio_auditar_guardado_ficha(db, request, procedimiento, form_data):
+    tarea = angio_clasificar_formulario_ficha(form_data)
+    campos = angio_campos_visibles_formulario(form_data)
+
+    detalle = (
+        f"procedimiento_id={procedimiento.id}; "
+        f"guardado_ficha; "
+        f"seccion={tarea}; "
+        f"campos={campos}"
+    )
+
+    if tarea == "stroke" or "stroke" in tarea:
+        detalle += (
+            f"; tiempo_puncion_recanalizacion_min="
+            f"{getattr(procedimiento, 'acv_tiempo_puncion_recanalizacion_minutos', '')}"
+        )
+
+    angio_registrar_evento_ficha(
+        db=db,
+        request=request,
+        procedimiento_id=procedimiento.id,
+        accion="FICHA_UPDATED",
+        tarea=tarea,
+        estado="ok",
+        detalle=detalle,
+    )
+
+
+
+
+# ANGIO-CASE-ACTIVITY-WRITE-V11
+def _angio_usuario_sesion_v11(request):
+    try:
+        return (
+            request.session.get("user")
+            or request.session.get("usuario")
+            or request.session.get("username")
+            or "usuario"
+        )
+    except Exception:
+        return "usuario"
+
+
+def _angio_registrar_actividad_caso_v11(
+    db,
+    request,
+    procedimiento_id,
+    accion,
+    tarea,
+    detalle="",
+    estado="ok",
+):
+    """
+    Escribe evento en auditoria_eventos asociado al caso.
+    Alimenta Auditoría general y Actividad del caso.
+    """
+    try:
+        evento = AuditoriaEvento(
+            usuario=_angio_usuario_sesion_v11(request),
+            accion=accion,
+            tarea=tarea,
+            estado=estado,
+            caso_id=procedimiento_id,
+            detalle=detalle,
+        )
+
+        try:
+            evento.ip = request.client.host if request.client else None
+            evento.user_agent = request.headers.get("user-agent")
+        except Exception:
+            pass
+
+        try:
+            from services.audit_service import get_client_timezone, get_client_utc_offset_minutes
+            evento.client_timezone = get_client_timezone(request)
+            evento.client_utc_offset_minutes = get_client_utc_offset_minutes(request)
+        except Exception:
+            pass
+
+        db.add(evento)
+        db.commit()
+        return True
+    except Exception:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        return False
+
+
+def _angio_clasificar_form_ficha_v11(form_data):
+    keys = set(form_data.keys())
+
+    identificacion = {
+        "paciente_nombre",
+        "paciente_apellido",
+        "paciente_sexo",
+        "paciente_fecha_nacimiento",
+        "paciente_id",
+        "edad",
+        "institucion",
+        "estado_caso",
+    }
+
+    procedimiento = {
+        "fecha",
+        "tipo_procedimiento",
+        "procedimiento",
+        "procedimiento_txt",
+        "diagnostico",
+        "presentacion_clinica",
+        "localizacion",
+        "complicaciones",
+        "complicaciones_si_no",
+        "radiacion_dosis",
+        "contraste_ml",
+    }
+
+    datos_clinicos = {
+        "informe_procedimiento",
+        "indicaciones",
+        "fecha_ingreso",
+        "fecha_alta",
+        "proxima_visita_agendada",
+        "notas_adicionales",
+    }
+
+    grupos = []
+
+    if keys.intersection(identificacion):
+        grupos.append("informacion_paciente")
+
+    if keys.intersection(procedimiento):
+        grupos.append("procedimiento")
+
+    if keys.intersection(datos_clinicos):
+        grupos.append("datos_clinicos")
+
+    if any(k.startswith("acv_") for k in keys):
+        grupos.append("stroke")
+
+    return "+".join(grupos) if grupos else "ficha"
+
+
+def _angio_log_guardado_ficha_v11(db, request, procedimiento, form_data):
+    tarea = _angio_clasificar_form_ficha_v11(form_data)
+    campos = ",".join(sorted(set(str(k) for k in form_data.keys())))
+
+    _angio_registrar_actividad_caso_v11(
+        db=db,
+        request=request,
+        procedimiento_id=procedimiento.id,
+        accion="FICHA_UPDATED",
+        tarea=tarea,
+        estado="ok",
+        detalle=f"procedimiento_id={procedimiento.id}; seccion={tarea}; campos={campos}",
+    )
+
+
+
+# ANGIO-PARSE-FLOAT-V12
+def parse_float_or_none(valor):
+    if valor is None:
+        return None
+
+    texto = str(valor).strip()
+    if not texto:
+        return None
+
+    # Acepta formato decimal con coma o punto.
+    texto = texto.replace(",", ".")
+
+    try:
+        return float(texto)
+    except ValueError:
+        return None
 
 
 @router.post("/procedimientos/{procedimiento_id}/editar")
@@ -1145,6 +1741,11 @@ async def editar_procedimiento(
     set_datetime("hora_llegada_paciente_angio", "acv_hora_llegada_paciente")
     set_datetime("hora_puncion_femoral", "acv_hora_puncion")
     set_datetime("acv_hora_recanalizacion")
+    # ANGIO-STROKE-TIEMPO-SERVER-V8
+    p.acv_tiempo_puncion_recanalizacion_minutos = calcular_minutos_entre(
+        p.hora_puncion_femoral,
+        p.acv_hora_recanalizacion,
+    )
     set_texto("acv_lugar_acceso")
     set_texto("acv_lateralidad")
     set_texto("acv_nivel_oclusion")
@@ -1194,6 +1795,13 @@ async def editar_procedimiento(
             asegurar_tag(db, "tipo_procedimiento", p.tipo_procedimiento)
 
     db.commit()
+
+    # ANGIO-LOG-FICHA-UPDATED-V11
+    _angio_log_guardado_ficha_v11(db, request, p, form_data)
+
+
+    # ANGIO-AUDITAR-GUARDADO-FICHA-V8
+    angio_auditar_guardado_ficha(db, request, p, form_data)
 
     return RedirectResponse(
         url=f"/procedimientos/{procedimiento_id}",
@@ -3162,6 +3770,30 @@ async def agregar_participante_v3(
         db.add(item)
         db.commit()
 
+        # ANGIO-LOG-PARTICIPANTE-ADD-V11
+        _angio_registrar_actividad_caso_v11(
+            db=db,
+            request=request,
+            procedimiento_id=procedimiento_id,
+            accion="FICHA_PARTICIPANTE_ADDED",
+            tarea="participantes",
+            estado="ok",
+            detalle=f"procedimiento_id={procedimiento_id}; nombre={nombre or ''}; rol={rol or ''}",
+        )
+
+
+        # ANGIO-LOG-PARTICIPANTE-ADD-V8
+        angio_registrar_evento_ficha(
+            db=db,
+            request=request,
+            procedimiento_id=procedimiento_id,
+            accion="FICHA_PARTICIPANTE_ADDED",
+            tarea="participantes",
+            estado="ok",
+            detalle=f"procedimiento_id={procedimiento_id}; participante_agregado; nombre={nombre or ''}; rol={rol or ''}; fellow={es_fellow}",
+        )
+
+
         try:
             registrar_auditoria(
                 db=db,
@@ -3197,6 +3829,30 @@ async def eliminar_participante_v3(
         detalle = f"procedimiento_id={procedimiento_id}; nombre={getattr(item, 'nombre', '') or ''}; rol={getattr(item, 'rol', '') or ''}"
         db.delete(item)
         db.commit()
+
+        # ANGIO-LOG-PARTICIPANTE-DELETE-V11
+        _angio_registrar_actividad_caso_v11(
+            db=db,
+            request=request,
+            procedimiento_id=procedimiento_id,
+            accion="FICHA_PARTICIPANTE_DELETED",
+            tarea="participantes",
+            estado="ok",
+            detalle=f"procedimiento_id={procedimiento_id}; participante_id={participante_id}",
+        )
+
+
+        # ANGIO-LOG-PARTICIPANTE-DELETE-V8
+        angio_registrar_evento_ficha(
+            db=db,
+            request=request,
+            procedimiento_id=procedimiento_id,
+            accion="FICHA_PARTICIPANTE_DELETED",
+            tarea="participantes",
+            estado="ok",
+            detalle=f"procedimiento_id={procedimiento_id}; participante_eliminado; id={participante_id}",
+        )
+
 
         try:
             registrar_auditoria(
@@ -3246,6 +3902,30 @@ async def agregar_material_dedicado_v4(
         db.add(item)
         db.commit()
 
+        # ANGIO-LOG-MATERIAL-ADD-V11
+        _angio_registrar_actividad_caso_v11(
+            db=db,
+            request=request,
+            procedimiento_id=procedimiento_id,
+            accion="FICHA_MATERIAL_ADDED",
+            tarea="materiales",
+            estado="ok",
+            detalle=f"procedimiento_id={procedimiento_id}; tipo={tipo or ''}; nombre={nombre or ''}; tamano={tamano or ''}; marca={marca or ''}",
+        )
+
+
+        # ANGIO-LOG-MATERIAL-ADD-V8
+        angio_registrar_evento_ficha(
+            db=db,
+            request=request,
+            procedimiento_id=procedimiento_id,
+            accion="FICHA_MATERIAL_ADDED",
+            tarea="materiales",
+            estado="ok",
+            detalle=f"procedimiento_id={procedimiento_id}; material_agregado; tipo={tipo or ''}; nombre={nombre or ''}; tamano={tamano or ''}; marca={marca or ''}",
+        )
+
+
         try:
             registrar_auditoria(
                 db=db,
@@ -3281,6 +3961,30 @@ async def eliminar_material_dedicado_v4(
         detalle = f"procedimiento_id={procedimiento_id}; tipo={item.tipo or ''}; nombre={item.nombre or ''}; tamano={item.tamano or ''}; marca={item.marca or ''}"
         db.delete(item)
         db.commit()
+
+        # ANGIO-LOG-MATERIAL-DELETE-V11
+        _angio_registrar_actividad_caso_v11(
+            db=db,
+            request=request,
+            procedimiento_id=procedimiento_id,
+            accion="FICHA_MATERIAL_DELETED",
+            tarea="materiales",
+            estado="ok",
+            detalle=f"procedimiento_id={procedimiento_id}; material_id={material_id}",
+        )
+
+
+        # ANGIO-LOG-MATERIAL-DELETE-V8
+        angio_registrar_evento_ficha(
+            db=db,
+            request=request,
+            procedimiento_id=procedimiento_id,
+            accion="FICHA_MATERIAL_DELETED",
+            tarea="materiales",
+            estado="ok",
+            detalle=f"procedimiento_id={procedimiento_id}; material_eliminado; id={material_id}",
+        )
+
 
         try:
             registrar_auditoria(
