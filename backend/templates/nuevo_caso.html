@@ -3,48 +3,45 @@
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta charset="UTF-8">
-<title>Nuevo caso</title>
+<title>Nuevo caso - NeuroPACS</title>
 <link rel="stylesheet" href="/static/css/style.css">
 </head>
 
 <body>
+
 <div class="app-shell">
+
 {% include "_sidebar.html" %}
 
-<div class="main-panel">
-
+<section class="main-panel">
 
 <header class="topbar">
     <div class="brand">
-        <h1>NeuroPACS</h1>
-        <span>Nuevo caso</span>
+        <h1>Nuevo caso</h1>
+        <span>Identificación inicial del paciente y procedimiento</span>
     </div>
-
 </header>
 
 <main class="container">
 
-<a class="btn btn-secondary" href="/">Volver</a>
-
 <div class="card">
-    <h1>Nuevo caso</h1>
-    <p class="small">
-        Crea un caso desde la web. Luego podrás agregar participantes, materiales, archivos, DICOM y notas.
+    <h2 class="card-title">Identificación</h2>
+    <p class="muted">
+        Crea la identificación básica del caso. Los datos clínicos, participantes,
+        materiales, archivos y DICOM se completan después desde la ficha del caso.
     </p>
 
-    <form method="post" action="/nuevo-caso">
-
-        <h2 class="card-title">Identificación</h2>
+    <form method="post" action="/nuevo-caso" id="nuevoCasoForm">
 
         <div class="two">
             <div>
                 <label>Nombre</label>
-                <input name="paciente_nombre" placeholder="Nombre">
+                <input name="paciente_nombre" autocomplete="off">
             </div>
 
             <div>
                 <label>Apellido</label>
-                <input name="paciente_apellido" placeholder="Apellido">
+                <input name="paciente_apellido" autocomplete="off">
             </div>
         </div>
 
@@ -53,89 +50,57 @@
                 <label>Sexo</label>
                 <select name="paciente_sexo">
                     <option value="">Sin especificar</option>
-                    <option value="hombre">Hombre</option>
-                    <option value="mujer">Mujer</option>
+                    <option value="F">Femenino</option>
+                    <option value="M">Masculino</option>
+                    <option value="Otro">Otro</option>
                 </select>
             </div>
 
             <div>
                 <label>Fecha nacimiento</label>
-                <input id="paciente_fecha_nacimiento" name="paciente_fecha_nacimiento" type="date">
+                <input name="paciente_fecha_nacimiento" id="pacienteFechaNacimiento" type="date">
             </div>
 
             <div>
-                <label>Edad</label>
-                <input id="edad" name="edad" placeholder="Edad">
+                <label>Edad calculada</label>
+                <input name="edad" id="edadCalculada" readonly placeholder="Automática">
             </div>
         </div>
 
         <div class="two">
             <div>
-                <label>ID / RUT / ficha</label>
-                <input name="paciente_id" placeholder="Identificador">
+                <label>ID / RUT / DNI / ficha</label>
+                <input name="paciente_id" autocomplete="off">
             </div>
 
-            <div>
-                <label>Historia clínica</label>
-                <input name="historia_clinica" placeholder="HC">
-            </div>
-        </div>
-
-        <div class="two">
-            <div>
-                <label>Mail paciente</label>
-                <input name="paciente_mail" placeholder="correo@ejemplo.cl">
-            </div>
-
-            <div>
-                <label>Teléfono paciente</label>
-                <input name="paciente_telefono" placeholder="+56 9...">
-            </div>
-        </div>
-
-        <h2 class="card-title">Procedimiento</h2>
-
-        <div class="two">
             <div>
                 <label>Institución</label>
-                <input name="institucion" list="instituciones" placeholder="Institución">
-                <datalist id="instituciones">
-                    {% for item in sugerencias_instituciones %}
-                    <option value="{{ item }}">
+                <input name="institucion" list="instituciones-list" autocomplete="off">
+                <datalist id="instituciones-list">
+                    {% for tag in tags_institucion or [] %}
+                        <option value="{{ tag.nombre }}">
                     {% endfor %}
                 </datalist>
             </div>
+        </div>
 
+        <div class="two">
             <div>
-                <label>Fecha del procedimiento / caso</label>
-                <input id="fecha_procedimiento" name="fecha" type="date">
-                <div class="small">Fecha ingresada manualmente.</div>
+                <label>Fecha del procedimiento</label>
+                <input name="fecha" type="date">
+                <p class="small muted">Fecha ingresada manualmente.</p>
             </div>
 
             <div>
                 <label>Estado del caso</label>
                 <select name="estado_caso">
                     <option value="abierto" selected>Abierto</option>
-                    <option value="hospitalizado">Hospitalizado</option>
-                    <option value="pendiente_control">Pendiente control posterior</option>
-                    <option value="de_alta">De alta</option>
+                    <option value="hospitalizado">Está hospitalizado</option>
+                    <option value="pendiente_control_ambulatorio">Pendiente control ambulatorio</option>
+                    <option value="cerrado">Cerrado</option>
                 </select>
             </div>
         </div>
-
-        <label>Procedimiento</label>
-        <input name="procedimiento_txt" list="procedimientos_sugeridos" placeholder="Ej: angiografia_diagnostica">
-        <datalist id="procedimientos_sugeridos">
-            {% for item in sugerencias_procedimientos %}
-            <option value="{{ item }}">
-            {% endfor %}
-        </datalist>
-
-        <label>Diagnóstico</label>
-        <textarea name="diagnostico" placeholder="Diagnóstico o motivo del procedimiento"></textarea>
-
-        <label>Presentación clínica</label>
-        <textarea name="presentacion_clinica" placeholder="Presentación clínica breve"></textarea>
 
         <button type="submit">Crear caso</button>
 
@@ -143,85 +108,52 @@
 </div>
 
 </main>
-
-<script>
-function calcularEdadAngio() {
-    const fn = document.getElementById("paciente_fecha_nacimiento");
-    const fp = document.getElementById("fecha_procedimiento");
-    const edad = document.getElementById("edad");
-
-    if (!fn || !fp || !edad || !fn.value) {
-        return;
-    }
-
-    const nacimiento = new Date(fn.value + "T00:00:00");
-    const referencia = fp.value ? new Date(fp.value + "T00:00:00") : new Date();
-
-    let anios = referencia.getFullYear() - nacimiento.getFullYear();
-    const m = referencia.getMonth() - nacimiento.getMonth();
-
-    if (m < 0 || (m === 0 && referencia.getDate() < nacimiento.getDate())) {
-        anios--;
-    }
-
-    if (!Number.isNaN(anios) && anios >= 0) {
-        edad.value = anios;
-    }
-}
-
-document.addEventListener("DOMContentLoaded", function() {
-    const fn = document.getElementById("paciente_fecha_nacimiento");
-    const fp = document.getElementById("fecha_procedimiento");
-
-    if (fn) fn.addEventListener("change", calcularEdadAngio);
-    if (fp) fp.addEventListener("change", calcularEdadAngio);
-});
-</script>
-</div>
+</section>
 </div>
 
-<!-- NeuroPACS: alerta de cambios no guardados -->
-<div id="save-status" class="save-status saved" style="display:none;">Guardado</div>
-
+<!-- ANGIO-NUEVO-CASO-EDAD-CALCULADA-V1 -->
 <script>
-document.addEventListener("DOMContentLoaded", function () {
-    let dirty = false;
-    const status = document.getElementById("save-status");
+(function () {
+    function calcularEdad(fechaTexto) {
+        if (!fechaTexto) return "";
 
-    function showStatus(text, cls) {
-        if (!status) return;
-        status.style.display = "block";
-        status.textContent = text;
-        status.className = "save-status " + cls;
+        const nacimiento = new Date(fechaTexto + "T00:00:00");
+        if (Number.isNaN(nacimiento.getTime())) return "";
+
+        const hoy = new Date();
+        let edad = hoy.getFullYear() - nacimiento.getFullYear();
+
+        const mesActual = hoy.getMonth();
+        const diaActual = hoy.getDate();
+        const mesNacimiento = nacimiento.getMonth();
+        const diaNacimiento = nacimiento.getDate();
+
+        if (
+            mesActual < mesNacimiento ||
+            (mesActual === mesNacimiento && diaActual < diaNacimiento)
+        ) {
+            edad -= 1;
+        }
+
+        if (edad < 0 || edad > 130) return "";
+        return String(edad);
     }
 
-    function setDirty() {
-        dirty = true;
-        showStatus("Cambios sin guardar", "dirty");
-    }
+    document.addEventListener("DOMContentLoaded", function () {
+        const fecha = document.getElementById("pacienteFechaNacimiento");
+        const edad = document.getElementById("edadCalculada");
 
-    const fields = document.querySelectorAll("input, textarea, select");
-    const forms = document.querySelectorAll("form");
+        if (!fecha || !edad) return;
 
-    fields.forEach(function (field) {
-        field.addEventListener("input", setDirty);
-        field.addEventListener("change", setDirty);
+        function actualizar() {
+            edad.value = calcularEdad(fecha.value);
+        }
+
+        fecha.addEventListener("input", actualizar);
+        fecha.addEventListener("change", actualizar);
+        actualizar();
     });
-
-    forms.forEach(function (form) {
-        form.addEventListener("submit", function () {
-            dirty = false;
-            showStatus("Guardando...", "saving");
-        });
-    });
-
-    window.addEventListener("beforeunload", function (event) {
-        if (!dirty) return;
-
-        event.preventDefault();
-        event.returnValue = "";
-    });
-});
+})();
 </script>
 
 </body>

@@ -224,7 +224,7 @@ def casos_activos(
     if auth:
         return auth
 
-    estados_visibles = ["abierto", "hospitalizado", "pendiente_control"]
+    estados_visibles = ["abierto", "hospitalizado", "pendiente_control_ambulatorio"]
 
     procedimientos_db = (
         db.query(Procedimiento)
@@ -243,7 +243,7 @@ def casos_activos(
     conteos = {
         "abierto": 0,
         "hospitalizado": 0,
-        "pendiente_control": 0,
+        "pendiente_control_ambulatorio": 0,
     }
 
     for p in procedimientos:

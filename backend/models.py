@@ -18,6 +18,7 @@ class Procedimiento(Base):
     paciente_mail = Column(String(255), nullable=True)
     paciente_telefono = Column(String(100), nullable=True)
     edad = Column(Integer, nullable=True)
+    obra_social = Column(String(255), nullable=True)
 
     # Datos del procedimiento
     lugar = Column(String(255), nullable=True)
@@ -28,6 +29,14 @@ class Procedimiento(Base):
     estado_caso = Column(String(50), index=True, default="abierto")
     procedimiento = Column(String(255), nullable=True)
     diagnostico = Column(Text, nullable=True)
+    procedimiento_urgente = Column(String(20), nullable=True)
+    origen_paciente = Column(String(50), nullable=True)
+    tipo_procedimiento = Column(String(100), nullable=True)
+    localizacion = Column(Text, nullable=True)
+    radiacion_dosis = Column(String(100), nullable=True)
+    contraste_ml = Column(Float, nullable=True)
+    fecha_ingreso = Column(Date, nullable=True)
+    fecha_alta = Column(Date, nullable=True)
 
     # Campos legacy, se mantienen temporalmente para compatibilidad
     primer_operador = Column(String(255), nullable=True)
@@ -51,6 +60,22 @@ class Procedimiento(Base):
     hora_puncion_femoral = Column(DateTime, nullable=True)
     hora_apertura_arteria = Column(DateTime, nullable=True)
     hora_fin_procedimiento = Column(DateTime, nullable=True)
+
+    # Stroke / trombectomía estructurado
+    acv_nih_inicial = Column(Integer, nullable=True)
+    acv_nih_llegada = Column(Integer, nullable=True)
+    acv_nih_postprocedimiento = Column(Integer, nullable=True)
+    acv_aspects = Column(Integer, nullable=True)
+    acv_hora_recanalizacion = Column(DateTime, nullable=True)
+    acv_tiempo_puncion_recanalizacion_minutos = Column(Integer, nullable=True)
+    acv_lugar_acceso = Column(String(100), nullable=True)
+    acv_lateralidad = Column(String(50), nullable=True)
+    acv_nivel_oclusion = Column(Text, nullable=True)
+    acv_tici = Column(String(20), nullable=True)
+    acv_modalidad_procedimiento = Column(String(50), nullable=True)
+    acv_imagen_tc = Column(Boolean, default=False)
+    acv_imagen_rm = Column(Boolean, default=False)
+    acv_imagen_dsa = Column(Boolean, default=False)
 
     # Campos legacy de materiales, se mantienen temporalmente
     vaina = Column(String(100), nullable=True)
@@ -87,6 +112,8 @@ class Procedimiento(Base):
     creado_en = Column(DateTime, default=datetime.utcnow)
     actualizado_en = Column(DateTime, default=datetime.utcnow)
 
+    materiales_procedimiento = relationship("MaterialProcedimiento", back_populates="procedimiento", cascade="all, delete-orphan")
+    sitios_occlusion = relationship("SitioOclusion", back_populates="procedimiento", cascade="all, delete-orphan")
     archivos = relationship("Archivo", back_populates="procedimiento", cascade="all, delete-orphan")
     participantes = relationship("ParticipanteProcedimiento", back_populates="procedimiento", cascade="all, delete-orphan")
     materiales = relationship("MaterialProcedimiento", back_populates="procedimiento", cascade="all, delete-orphan")
@@ -127,6 +154,8 @@ class Archivo(Base):
 
     estado = Column(Text, default="pendiente")
     creado_en = Column(DateTime, default=datetime.utcnow)
+    tamano = Column(String(120), nullable=True)
+    marca = Column(String(120), nullable=True)
 
 
 class ParticipanteProcedimiento(Base):
@@ -142,6 +171,7 @@ class ParticipanteProcedimiento(Base):
     notas = Column(Text, nullable=True)
 
     creado_en = Column(DateTime, default=datetime.utcnow)
+    es_fellow = Column(Boolean, default=False)
 
 
 class MaterialProcedimiento(Base):
@@ -150,10 +180,13 @@ class MaterialProcedimiento(Base):
     id = Column(Integer, primary_key=True, index=True)
 
     procedimiento_id = Column(Integer, ForeignKey("procedimientos.id"), nullable=False)
-    procedimiento = relationship("Procedimiento", back_populates="materiales")
+    procedimiento = relationship("Procedimiento", back_populates="materiales_procedimiento", overlaps="materiales")
 
     nombre = Column(String(255), nullable=False)
+    tipo = Column(String(120), nullable=True)
     tipo_material = Column(String(100), nullable=True)
+    tamano = Column(String(120), nullable=True)
+    marca = Column(String(120), nullable=True)
     cantidad = Column(Integer, default=1)
     notas = Column(Text, nullable=True)
 
@@ -298,3 +331,18 @@ class AuditoriaEvento(Base):
     archivo_bytes = Column(Integer, nullable=True)
 
     detalle = Column(Text, nullable=True)
+
+
+# ANGIO-OCLUSIONES-MULTIPLES-LIMPIO-V1
+class SitioOclusion(Base):
+    __tablename__ = "sitios_occlusion"
+
+    id = Column(Integer, primary_key=True, index=True)
+    procedimiento_id = Column(Integer, ForeignKey("procedimientos.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    lateralidad = Column(String(50), nullable=True)
+    sitio_anatomico = Column(String(255), nullable=True)
+    metodo_recanalizacion = Column(String(50), nullable=True)
+    tici = Column(String(20), nullable=True)
+
+    procedimiento = relationship("Procedimiento", back_populates="sitios_occlusion")

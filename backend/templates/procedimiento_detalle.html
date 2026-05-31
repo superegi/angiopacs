@@ -51,15 +51,15 @@
         </div>
 
 <textarea id="angio-copy-textarea" rows="22" readonly>Lugar del procedimiento: {{ procedimiento.institucion or procedimiento.lugar or "" }}
-Historia Clínica: {{ procedimiento.historia_clinica or "" }}
-O social:
+Obra social: {{ procedimiento.obra_social or "" }}
 Nombre del Paciente: {{ ((procedimiento.paciente_apellido or "") ~ " " ~ (procedimiento.paciente_nombre or ""))|trim }}
 Edad: {{ procedimiento.edad or "" }}
 Fecha: {{ procedimiento.fecha or "" }}
+Tipo procedimiento: {{ procedimiento.tipo_procedimiento or "" }}
 1er Operador: {{ datos.op1 or procedimiento.primer_operador or "" }}
 2do operador: {{ datos.op2 or procedimiento.segundo_operador or "" }}
 Fellow: {{ datos.fellow or procedimiento.fellow or "" }}
-Localización: {{ procedimiento.localizacion_aneurisma or "" }}
+Localización: {{ procedimiento.localizacion or procedimiento.localizacion_aneurisma or "" }}
 Vaina: {{ procedimiento.vaina or "" }}
 Micro catéter: {{ procedimiento.microcateter or "" }}
 Guía: {{ procedimiento.guia or procedimiento.microguia or "" }}
@@ -159,6 +159,13 @@ Complicaciones: {% if procedimiento.complicaciones_si_no %}{{ procedimiento.comp
 
 
 <div class="card case-summary-card">
+    <!-- ANGIO-CASE-STATUS-CORNER-V1 -->
+    <div class="case-status-corner">
+        {% set estado_visible = procedimiento.estado_caso or "abierto" %}
+        <span class="case-status-badge case-status-{{ estado_visible }}">
+            {{ estado_visible|replace("_", " ") }}
+        </span>
+    </div>
     <h1>{{ (procedimiento.paciente_nombre or "Sin nombre") }} {{ procedimiento.paciente_apellido or "" }}</h1>
 
     <div class="case-summary-text">
@@ -185,8 +192,6 @@ Complicaciones: {% if procedimiento.complicaciones_si_no %}{{ procedimiento.comp
         <p>
             <b>Próxima visita:</b> {{ procedimiento.proxima_visita_agendada or "—" }}
             &nbsp; · &nbsp;
-            <b>Estado:</b> {{ procedimiento.estado_caso or "abierto" }}
-            &nbsp; · &nbsp;
             <b>Creado/subido:</b> {{ procedimiento.creado_en or "—" }}
         </p>
     </div>
@@ -208,8 +213,9 @@ Complicaciones: {% if procedimiento.complicaciones_si_no %}{{ procedimiento.comp
 
 
 
+
 <div class="card">
-    <h2 class="card-title">Identificación del caso</h2>
+    <h2 class="card-title">Identificación Paciente</h2>
 
     <form method="post" action="/procedimientos/{{ procedimiento.id }}/editar">
 
@@ -229,9 +235,10 @@ Complicaciones: {% if procedimiento.complicaciones_si_no %}{{ procedimiento.comp
             <div>
                 <label>Sexo</label>
                 <select name="paciente_sexo">
-                    <option value="">Sin especificar</option>
+                    <option value="" {% if not procedimiento.paciente_sexo %}selected{% endif %}>Sin especificar</option>
                     <option value="hombre" {% if procedimiento.paciente_sexo == "hombre" %}selected{% endif %}>Hombre</option>
                     <option value="mujer" {% if procedimiento.paciente_sexo == "mujer" %}selected{% endif %}>Mujer</option>
+                    <option value="otro" {% if procedimiento.paciente_sexo == "otro" %}selected{% endif %}>Otro</option>
                 </select>
             </div>
 
@@ -242,19 +249,19 @@ Complicaciones: {% if procedimiento.complicaciones_si_no %}{{ procedimiento.comp
 
             <div>
                 <label>Edad</label>
-                <input id="edad" name="edad" value="{{ procedimiento.edad or '' }}">
+                <input id="edad" name="edad" value="{{ procedimiento.edad or '' }}" readonly>
             </div>
         </div>
 
         <div class="two">
             <div>
-                <label>ID / RUT / ficha</label>
+                <label>ID / RUT / DNI / ficha</label>
                 <input name="paciente_id" value="{{ procedimiento.paciente_id or '' }}">
             </div>
 
             <div>
-                <label>Historia clínica</label>
-                <input name="historia_clinica" value="{{ procedimiento.historia_clinica or '' }}">
+                <label>Obra social</label>
+                <input name="obra_social" value="{{ procedimiento.obra_social or '' }}">
             </div>
         </div>
 
@@ -270,58 +277,112 @@ Complicaciones: {% if procedimiento.complicaciones_si_no %}{{ procedimiento.comp
             </div>
         </div>
 
+        <label>Estado del caso</label>
+        <select name="estado_caso">
+                    <option value="abierto" {% if procedimiento.estado_caso == "abierto" or not procedimiento.estado_caso %}selected{% endif %}>Abierto</option>
+                    <option value="hospitalizado" {% if procedimiento.estado_caso == "hospitalizado" %}selected{% endif %}>Está hospitalizado</option>
+                    <option value="pendiente_control_ambulatorio" {% if procedimiento.estado_caso == "pendiente_control_ambulatorio" %}selected{% endif %}>Pendiente control ambulatorio</option>
+                    <option value="cerrado" {% if procedimiento.estado_caso == "cerrado" %}selected{% endif %}>Cerrado</option>
+                </select>
+
+        <button type="submit">Guardar identificación</button>
+    </form>
+</div>
+
+<div class="card">
+    <h2 class="card-title">Procedimiento</h2>
+
+    <form method="post" action="/procedimientos/{{ procedimiento.id }}/editar">
+
         <div class="two">
             <div>
+                <label>Procedimiento urgente</label>
+                <select name="procedimiento_urgente">
+                    <option value="" {% if not procedimiento.procedimiento_urgente %}selected{% endif %}>Sin especificar</option>
+                    <option value="si" {% if procedimiento.procedimiento_urgente == "si" %}selected{% endif %}>Sí</option>
+                    <option value="no" {% if procedimiento.procedimiento_urgente == "no" %}selected{% endif %}>No</option>
+                </select>
+            </div>
+
+            <div>
+                <label>Origen paciente</label>
+                <select name="origen_paciente">
+                    <option value="" {% if not procedimiento.origen_paciente %}selected{% endif %}>Sin especificar</option>
+                    <option value="ambulatorio" {% if procedimiento.origen_paciente == "ambulatorio" %}selected{% endif %}>Ambulatorio</option>
+                    <option value="hospitalizado" {% if procedimiento.origen_paciente == "hospitalizado" %}selected{% endif %}>Está hospitalizado</option>
+                    <option value="urgencia" {% if procedimiento.origen_paciente == "urgencia" %}selected{% endif %}>Urgencia</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="two">
+            <div>
+                <label>Fecha procedimiento</label>
+                <input id="fecha_procedimiento" name="fecha" type="date" value="{{ procedimiento.fecha or '' }}">
+            </div>
+
+            <div>
                 <label>Institución</label>
-                <input name="institucion" list="instituciones_caso" value="{{ procedimiento.institucion or '' }}" placeholder="Institución">
+                <input name="institucion" list="instituciones_caso" value="{{ procedimiento.institucion or procedimiento.lugar or '' }}">
                 <datalist id="instituciones_caso">
                     {% for item in sugerencias_instituciones or [] %}
                     <option value="{{ item }}">
                     {% endfor %}
                 </datalist>
             </div>
-
-            <div>
-                <label>Fecha del procedimiento / caso</label>
-                <input id="fecha_procedimiento" name="fecha" type="date" value="{{ procedimiento.fecha or '' }}">
-                <div class="small">Fecha ingresada manualmente.</div>
-            </div>
-
-            <div>
-                <label>Estado del caso</label>
-                <select name="estado_caso">
-                    <option value="abierto" {% if procedimiento.estado_caso == "abierto" or not procedimiento.estado_caso %}selected{% endif %}>Abierto</option>
-                    <option value="hospitalizado" {% if procedimiento.estado_caso == "hospitalizado" %}selected{% endif %}>Hospitalizado</option>
-                    <option value="pendiente_control" {% if procedimiento.estado_caso == "pendiente_control" %}selected{% endif %}>Pendiente control posterior</option>
-                    <option value="de_alta" {% if procedimiento.estado_caso == "de_alta" %}selected{% endif %}>De alta</option>
-                </select>
-            </div>
         </div>
-<button type="submit">Guardar identificación</button>
-    </form>
-</div>
 
-<div class="card">
-    <h2 class="card-title">Procedimiento clínico</h2>
-
-    <form method="post" action="/procedimientos/{{ procedimiento.id }}/editar">
+        <label>Tipo de procedimiento</label>
+        <select name="tipo_procedimiento">
+                    <option value="">Sin especificar</option>
+                    <optgroup label="Procedimientos diagnósticos">
+                        <option value="angiografia_cerebral" {% if procedimiento.tipo_procedimiento == "angiografia_cerebral" %}selected{% endif %}>Angiografía cerebral de 4 o 6 vasos</option>
+                        <option value="angiografia_medular" {% if procedimiento.tipo_procedimiento == "angiografia_medular" %}selected{% endif %}>Angiografía medular</option>
+                        <option value="test_wada" {% if procedimiento.tipo_procedimiento == "test_wada" %}selected{% endif %}>Test de WADA</option>
+                        <option value="test_oclusion_balon" {% if procedimiento.tipo_procedimiento == "test_oclusion_balon" %}selected{% endif %}>Test de oclusión con balón</option>
+                        <option value="muestreo_senos_petrosos" {% if procedimiento.tipo_procedimiento == "muestreo_senos_petrosos" %}selected{% endif %}>Muestreo de senos petrosos</option>
+                    </optgroup>
+                    <optgroup label="Patología isquémica">
+                        <option value="trombectomia_mecanica" {% if procedimiento.tipo_procedimiento == "trombectomia_mecanica" %}selected{% endif %}>Trombectomía mecánica</option>
+                        <option value="angioplastia_stenting_carotideo" {% if procedimiento.tipo_procedimiento == "angioplastia_stenting_carotideo" %}selected{% endif %}>Angioplastia y stenting carotídeo</option>
+                        <option value="trombolisis_intraarterial" {% if procedimiento.tipo_procedimiento == "trombolisis_intraarterial" %}selected{% endif %}>Trombólisis intraarterial</option>
+                    </optgroup>
+                    <optgroup label="Patología aneurismática">
+                        <option value="coiling_simple" {% if procedimiento.tipo_procedimiento == "coiling_simple" %}selected{% endif %}>Coiling simple</option>
+                        <option value="coiling_asistido" {% if procedimiento.tipo_procedimiento == "coiling_asistido" %}selected{% endif %}>Coiling asistido</option>
+                        <option value="divertor_flujo" {% if procedimiento.tipo_procedimiento == "divertor_flujo" %}selected{% endif %}>Divertor de flujo</option>
+                        <option value="dispositivo_intrasacular" {% if procedimiento.tipo_procedimiento == "dispositivo_intrasacular" %}selected{% endif %}>Dispositivo intrasacular</option>
+                    </optgroup>
+                    <optgroup label="Malformaciones vasculares">
+                        <option value="embolizacion_mav" {% if procedimiento.tipo_procedimiento == "embolizacion_mav" %}selected{% endif %}>Embolización de MAV</option>
+                        <option value="embolizacion_favd" {% if procedimiento.tipo_procedimiento == "embolizacion_favd" %}selected{% endif %}>Embolización de FAVd</option>
+                        <option value="malformacion_vena_galeno" {% if procedimiento.tipo_procedimiento == "malformacion_vena_galeno" %}selected{% endif %}>Malformación de vena de Galeno</option>
+                    </optgroup>
+                    <optgroup label="Patología venosa">
+                        <option value="stenting_senos_venosos" {% if procedimiento.tipo_procedimiento == "stenting_senos_venosos" %}selected{% endif %}>Stenting de senos venosos</option>
+                        <option value="trombectomia_fibrinolisis_venosa" {% if procedimiento.tipo_procedimiento == "trombectomia_fibrinolisis_venosa" %}selected{% endif %}>Trombectomía / fibrinólisis venosa</option>
+                    </optgroup>
+                    <optgroup label="Cabeza y cuello">
+                        <option value="embolizacion_tumor" {% if procedimiento.tipo_procedimiento == "embolizacion_tumor" %}selected{% endif %}>Embolización prequirúrgica de tumor</option>
+                        <option value="embolizacion_epistaxis" {% if procedimiento.tipo_procedimiento == "embolizacion_epistaxis" %}selected{% endif %}>Manejo de epistaxis refractaria</option>
+                        <option value="escleroterapia_cabeza_cuello" {% if procedimiento.tipo_procedimiento == "escleroterapia_cabeza_cuello" %}selected{% endif %}>Escleroterapia cabeza/cuello</option>
+                    </optgroup>
+                    <optgroup label="Columna / raquis">
+                        <option value="vertebroplastia_cifoplastia" {% if procedimiento.tipo_procedimiento == "vertebroplastia_cifoplastia" %}selected{% endif %}>Vertebroplastia / cifoplastia</option>
+                        <option value="infiltracion_bloqueo_raquis" {% if procedimiento.tipo_procedimiento == "infiltracion_bloqueo_raquis" %}selected{% endif %}>Infiltración selectiva / bloqueo facetario</option>
+                        <option value="tratamiento_fuga_lcr" {% if procedimiento.tipo_procedimiento == "tratamiento_fuga_lcr" %}selected{% endif %}>Tratamiento de fuga de LCR</option>
+                    </optgroup>
+                    <option value="otro" {% if procedimiento.tipo_procedimiento == "otro" %}selected{% endif %}>Otro</option>
+        </select>
 
         <label>Procedimiento</label>
-        <input name="procedimiento_txt" list="procedimientos_caso" value="{{ procedimiento.procedimiento or '' }}" placeholder="Ej: angiografia_diagnostica">
-        <datalist id="procedimientos_caso">
-            {% for item in sugerencias_procedimientos or [] %}
-            <option value="{{ item }}">
-            {% endfor %}
-        </datalist>
+        <input name="procedimiento_txt" value="{{ procedimiento.procedimiento or '' }}" placeholder="Ej: angiografía diagnóstica">
+
+        <label>Localización</label>
+        <input name="localizacion" value="{{ procedimiento.localizacion or procedimiento.localizacion_aneurisma or '' }}" placeholder="Texto libre">
 
         <label>Diagnóstico</label>
         <textarea name="diagnostico">{{ procedimiento.diagnostico or '' }}</textarea>
-
-        <label>Presentación clínica</label>
-        <textarea name="presentacion_clinica">{{ procedimiento.presentacion_clinica or '' }}</textarea>
-
-        <label>Indicaciones</label>
-        <textarea name="indicaciones">{{ procedimiento.indicaciones or '' }}</textarea>
 
         <div class="two">
             <div>
@@ -334,143 +395,433 @@ Complicaciones: {% if procedimiento.complicaciones_si_no %}{{ procedimiento.comp
             </div>
 
             <div>
-                <label>Cuál complicación</label>
-                <input name="complicaciones" value="{{ procedimiento.complicaciones or '' }}">
+                <label>Contraste utilizado (mL)</label>
+                <input name="contraste_ml" inputmode="decimal" value="{{ procedimiento.contraste_ml or '' }}" placeholder="Ej: 120">
             </div>
         </div>
+
+        <label>Complicación: cuál</label>
+        <textarea name="complicaciones" rows="4">{{ procedimiento.complicaciones or '' }}</textarea>
+
+        <label>Cantidad de radiación</label>
+        <input name="radiacion_dosis" value="{{ procedimiento.radiacion_dosis or '' }}" placeholder="Ej: DAP / Gy.cm² / mGy">
+
+        <button type="submit">Guardar procedimiento</button>
+    </form>
+</div>
+
+<div class="card">
+    <h2 class="card-title">Datos clínicos</h2>
+
+    <form method="post" action="/procedimientos/{{ procedimiento.id }}/editar">
+
+        <label>Presentación clínica</label>
+        <textarea name="presentacion_clinica">{{ procedimiento.presentacion_clinica or '' }}</textarea>
+
+
+        <!-- ANGIO-INFORME-PROCEDIMIENTO-DATOS-CLINICOS-V1 -->
+        <label>Informe del procedimiento</label>
+        <textarea name="informe_procedimiento" rows="5">{{ procedimiento.informe_procedimiento or '' }}</textarea>
+
+        <label>Indicaciones de alta</label>
+        <textarea name="indicaciones">{{ procedimiento.indicaciones or '' }}</textarea>
+
+
+        <!-- ANGIO-FECHAS-RAPIDAS-DATOS-CLINICOS-V1 -->
+        <div class="three">
+            <div>
+                <label>Fecha ingreso</label>
+                <div class="quick-date-row">
+                    <button type="button" class="btn btn-small quick-date-btn" data-target="fecha_ingreso" data-mode="today">Hoy</button>
+                    <button type="button" class="btn btn-small quick-date-btn" data-target="fecha_ingreso" data-mode="procedure">Igual que procedimiento</button>
+                </div>
+                <input id="fecha_ingreso" name="fecha_ingreso" type="date" value="{{ procedimiento.fecha_ingreso or '' }}">
+            </div>
+
+            <div>
+                <label>Fecha alta</label>
+                <div class="quick-date-row">
+                    <button type="button" class="btn btn-small quick-date-btn" data-target="fecha_alta" data-mode="today">Hoy</button>
+                    <button type="button" class="btn btn-small quick-date-btn" data-target="fecha_alta" data-mode="procedure">Igual que procedimiento</button>
+                </div>
+                <input id="fecha_alta" name="fecha_alta" type="date" value="{{ procedimiento.fecha_alta or '' }}">
+            </div>
+
+            <div>
+                <label>Fecha visita agendada</label>
+                <div class="quick-date-row">
+                    <button type="button" class="btn btn-small quick-date-btn" data-target="proxima_visita_agendada" data-mode="plus-days" data-days="30">30 días</button>
+                    <button type="button" class="btn btn-small quick-date-btn" data-target="proxima_visita_agendada" data-mode="plus-months" data-months="3">3 meses</button>
+                    <button type="button" class="btn btn-small quick-date-btn" data-target="proxima_visita_agendada" data-mode="plus-years" data-years="1">1 año</button>
+                </div>
+                <input id="proxima_visita_agendada" name="proxima_visita_agendada" type="date" value="{{ procedimiento.proxima_visita_agendada or '' }}">
+            </div>
+        </div>
+
 
         <label>Notas adicionales</label>
         <textarea name="notas_adicionales">{{ procedimiento.notas_adicionales or '' }}</textarea>
 
-        <label>Próxima visita agendada</label>
-        <input name="proxima_visita_agendada" type="date" value="{{ procedimiento.proxima_visita_agendada or '' }}">
-
-        <button type="submit">Guardar procedimiento clínico</button>
+        <button type="submit">Guardar datos clínicos</button>
     </form>
 </div>
 
-<div class="card">
-    <h2 class="card-title">Participantes estructurados</h2>
 
-    {% if participantes %}
-        <table>
-            <thead>
-                <tr>
-                    <th>Nombre</th>
-                    <th>Rol</th>
-                    <th>Notas</th>
-                    <th>Acción</th>
-                </tr>
-            </thead>
-            <tbody>
-            {% for participante in participantes %}
-                <tr>
-                    <td>{{ participante.nombre }}</td>
-                    <td>{{ participante.rol }}</td>
-                    <td>{{ participante.notas or "" }}</td>
-                    <td>
-                        <form method="post" action="/procedimientos/{{ procedimiento.id }}/participantes/{{ participante.id }}/eliminar" onsubmit="return confirm('¿Eliminar este participante del caso?');">
-                            <button type="submit" class="btn-danger btn-small">Eliminar</button>
-                        </form>
-                    </td>
-                </tr>
-            {% endfor %}
-            </tbody>
-        </table>
-    {% else %}
-        <p class="small">Aún no hay participantes estructurados.</p>
-    {% endif %}
-    <form method="post" action="/procedimientos/{{ procedimiento.id }}/participantes/agregar" class="inline-form">
+<div class="card">
+    <h2 class="card-title">Stroke</h2>
+    <!-- ANGIO-STROKE-V1 -->
+
+    <form method="post" action="/procedimientos/{{ procedimiento.id }}/editar">
+
+        <div class="two">
+            <div>
+                <label>Fecha y hora inicio síntomas</label>
+                <input name="acv_hora_inicio_sintomas" type="datetime-local"
+                       value="{{ procedimiento.hora_inicio_sintomas.strftime('%Y-%m-%dT%H:%M') if procedimiento.hora_inicio_sintomas else '' }}">
+            </div>
+
+            <div>
+                <label>Fecha y hora llegada paciente</label>
+                <input name="acv_hora_llegada_paciente" type="datetime-local"
+                       value="{{ procedimiento.hora_llegada_paciente_angio.strftime('%Y-%m-%dT%H:%M') if procedimiento.hora_llegada_paciente_angio else '' }}">
+            </div>
+        </div>
+
         <div class="three">
             <div>
-                <label>Nombre</label>
-                <input name="nombre" list="personas_procedimiento" placeholder="Dr / integrante" required>
-                <datalist id="personas_procedimiento">
-                    {% for item in sugerencias_personas %}
-                    <option value="{{ item }}">
-                    {% endfor %}
-                </datalist>
+                <label>NIH inicial</label>
+                <input name="acv_nih_inicial" inputmode="numeric" value="{{ procedimiento.acv_nih_inicial or '' }}">
             </div>
+<div>
+                <label>NIH postprocedimiento</label>
+                <input name="acv_nih_postprocedimiento" inputmode="numeric" value="{{ procedimiento.acv_nih_postprocedimiento or '' }}">
+            </div>
+        </div>
+
+        <div class="three">
+            <div>
+                <label>ASPECTS</label>
+                <input name="acv_aspects" inputmode="numeric" value="{{ procedimiento.acv_aspects or '' }}">
+            </div>
+<div>
+                <label>Forma de procedimiento</label>
+                <select name="acv_modalidad_procedimiento">
+                    <option value="">Sin especificar</option>
+                    <option value="despierto" {% if procedimiento.acv_modalidad_procedimiento == "despierto" %}selected{% endif %}>Despierto</option>
+                    <option value="sedado" {% if procedimiento.acv_modalidad_procedimiento == "sedado" %}selected{% endif %}>Sedado</option>
+                    <option value="intubado" {% if procedimiento.acv_modalidad_procedimiento == "intubado" %}selected{% endif %}>Intubado</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="three">
+            <div>
+                <label>Fecha y hora punción</label>
+                <input id="acvHoraPuncion" name="acv_hora_puncion" type="datetime-local"
+                       value="{{ procedimiento.hora_puncion_femoral.strftime('%Y-%m-%dT%H:%M') if procedimiento.hora_puncion_femoral else '' }}">
+            </div>
+
+            <div>
+                <label>Fecha y hora recanalización</label>
+                <input id="acvHoraRecanalizacion" name="acv_hora_recanalizacion" type="datetime-local"
+                       value="{{ procedimiento.acv_hora_recanalizacion.strftime('%Y-%m-%dT%H:%M') if procedimiento.acv_hora_recanalizacion else '' }}">
+            </div>
+
+            <div>
+                <label>Tiempo punción-recanalización en minutos</label>
+                <input id="acvTiempoPuncionRecanalizacion" readonly
+                       value="{{ procedimiento.acv_tiempo_puncion_recanalizacion_minutos or '' }}"
+                       placeholder="Automático en minutos">
+            </div>
+        </div>
+
+        <!-- ANGIO-IMAGENES-DIAGNOSTICAS-STROKE-V4 -->
+        <div class="diagnostic-images-box">
+            <label>Imágenes diagnósticas utilizadas</label>
+            <p class="field-help">
+                Marca las modalidades usadas para confirmar o guiar el diagnóstico del evento.
+            </p>
+
+            <div class="diagnostic-checks">
+                <label class="diagnostic-check">
+                    <input type="checkbox" name="acv_imagen_tc" value="1" {% if procedimiento.acv_imagen_tc %}checked{% endif %}>
+                    <span>TC</span>
+                </label>
+
+                <label class="diagnostic-check">
+                    <input type="checkbox" name="acv_imagen_rm" value="1" {% if procedimiento.acv_imagen_rm %}checked{% endif %}>
+                    <span>RM</span>
+                </label>
+
+                <label class="diagnostic-check">
+                    <input type="checkbox" name="acv_imagen_dsa" value="1" {% if procedimiento.acv_imagen_dsa %}checked{% endif %}>
+                    <span>DSA</span>
+                </label>
+            </div>
+
+            <p class="small muted diagnostic-images-current">
+                Actual:
+                {% if procedimiento.acv_imagen_tc %}<span class="badge">TC</span>{% endif %}
+                {% if procedimiento.acv_imagen_rm %}<span class="badge">RM</span>{% endif %}
+                {% if procedimiento.acv_imagen_dsa %}<span class="badge">DSA</span>{% endif %}
+                {% if not procedimiento.acv_imagen_tc and not procedimiento.acv_imagen_rm and not procedimiento.acv_imagen_dsa %}
+                    Sin imágenes marcadas
+                {% endif %}
+            </p>
+        </div>
+
+
+
+        <button type="submit">Guardar Stroke</button>
+    </form>
+
+<!-- ANGIO-OCLUSIONES-MULTIPLES-LIMPIO-V1 -->
+        <div id="stroke" class="occlusion-sites-box">
+            <h3>Sitios de oclusión</h3>
+            <p class="field-help">
+                Agrega uno o más sitios de oclusión. Cada sitio guarda lateralidad,
+                localización anatómica, método de recanalización y resultado TICI.
+            </p>
+
+            {% if procedimiento.sitios_occlusion %}
+            <div class="occlusion-list">
+                {% for sitio in procedimiento.sitios_occlusion %}
+                <div class="occlusion-item">
+                    <div>
+                        <b>{{ sitio.sitio_anatomico or "Sitio sin especificar" }}</b>
+                        <div class="small muted">
+                            Lateralidad: {{ sitio.lateralidad or "Sin especificar" }}
+                            · Método: {{ sitio.metodo_recanalizacion or "Sin especificar" }}
+                            · TICI: {{ sitio.tici or "Sin especificar" }}
+                        </div>
+                    </div>
+
+                    <form method="post" action="/procedimientos/{{ procedimiento.id }}/oclusiones/{{ sitio.id }}/eliminar" onsubmit="return confirm('¿Eliminar este sitio de oclusión?');">
+                        <button type="submit" class="btn btn-small btn-danger">Eliminar</button>
+                    </form>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="muted small">Sin sitios de oclusión agregados.</p>
+            {% endif %}
+
+            <form method="post" action="/procedimientos/{{ procedimiento.id }}/oclusiones/agregar" class="occlusion-add-form">
+                <div class="four">
+                    <div>
+                        <label>Lateralidad</label>
+                        <select name="lateralidad">
+                            <option value="">Sin especificar</option>
+                            <option value="izquierda">Izquierda</option>
+                            <option value="derecha">Derecha</option>
+                            <option value="ambas">Ambas</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label>Sitio anatómico de oclusión</label>
+                        <select name="sitio_anatomico">
+                            <option value="">Seleccionar opción frecuente</option>
+                            <option value="ACI cervical (C1): arteria carótida interna cervical">ACI cervical (C1): arteria carótida interna cervical</option>
+                            <option value="ACI petroso (C2): arteria carótida interna petrosa">ACI petroso (C2): arteria carótida interna petrosa</option>
+                            <option value="ACI lacerum (C3): segmento lacerum de la ACI">ACI lacerum (C3): segmento lacerum de la ACI</option>
+                            <option value="ACI cavernoso (C4): arteria carótida interna cavernosa">ACI cavernoso (C4): arteria carótida interna cavernosa</option>
+                            <option value="ACI clinoideo (C5): arteria carótida interna clinoidea">ACI clinoideo (C5): arteria carótida interna clinoidea</option>
+                            <option value="ACI oftálmico / supraclinoideo (C6): origen de arteria oftálmica">ACI oftálmico / supraclinoideo (C6): origen de arteria oftálmica</option>
+                            <option value="ACI comunicante / terminal (C7): bifurcación carotídea terminal">ACI comunicante / terminal (C7): bifurcación carotídea terminal</option>
+                            <option value="ACM M1: arteria cerebral media, tronco principal">ACM M1: arteria cerebral media, tronco principal</option>
+                            <option value="ACM M2: arteria cerebral media, segmento insular">ACM M2: arteria cerebral media, segmento insular</option>
+                            <option value="ACM M3: arteria cerebral media, segmento opercular">ACM M3: arteria cerebral media, segmento opercular</option>
+                            <option value="ACM M4: arteria cerebral media, ramas corticales">ACM M4: arteria cerebral media, ramas corticales</option>
+                            <option value="ACA A1: arteria cerebral anterior precomunicante">ACA A1: arteria cerebral anterior precomunicante</option>
+                            <option value="ACoA: arteria comunicante anterior">ACoA: arteria comunicante anterior</option>
+                            <option value="ACA A2: arteria cerebral anterior postcomunicante">ACA A2: arteria cerebral anterior postcomunicante</option>
+                            <option value="ACA A3: arteria cerebral anterior supracallosa">ACA A3: arteria cerebral anterior supracallosa</option>
+                            <option value="ACA A4/A5: arteria cerebral anterior distal">ACA A4/A5: arteria cerebral anterior distal</option>
+                            <option value="AV V1: arteria vertebral extraforaminal">AV V1: arteria vertebral extraforaminal</option>
+                            <option value="AV V2: arteria vertebral foraminal">AV V2: arteria vertebral foraminal</option>
+                            <option value="AV V3: arteria vertebral atlantoaxial">AV V3: arteria vertebral atlantoaxial</option>
+                            <option value="AV V4: arteria vertebral intracraneal">AV V4: arteria vertebral intracraneal</option>
+                            <option value="PICA: arteria cerebelosa posteroinferior">PICA: arteria cerebelosa posteroinferior</option>
+                            <option value="Basilar proximal: tronco basilar proximal">Basilar proximal: tronco basilar proximal</option>
+                            <option value="Basilar media: tronco basilar medio">Basilar media: tronco basilar medio</option>
+                            <option value="Basilar distal / top: bifurcación terminal basilar">Basilar distal / top: bifurcación terminal basilar</option>
+                            <option value="AICA: arteria cerebelosa anteroinferior">AICA: arteria cerebelosa anteroinferior</option>
+                            <option value="SCA / SUCA: arteria cerebelosa superior">SCA / SUCA: arteria cerebelosa superior</option>
+                            <option value="ACP P1: arteria cerebral posterior precomunicante">ACP P1: arteria cerebral posterior precomunicante</option>
+                            <option value="ACoP: arteria comunicante posterior">ACoP: arteria comunicante posterior</option>
+                            <option value="ACP P2: arteria cerebral posterior ambiente/postcomunicante">ACP P2: arteria cerebral posterior ambiente/postcomunicante</option>
+                            <option value="ACP P3/P4: arteria cerebral posterior distal/cortical">ACP P3/P4: arteria cerebral posterior distal/cortical</option>
+                            <option value="Watershed anterior: frontera ACA-ACM">Watershed anterior: frontera ACA-ACM</option>
+                            <option value="Watershed posterior: frontera ACM-ACP">Watershed posterior: frontera ACM-ACP</option>
+                            <option value="Watershed profundo: frontera subcortical">Watershed profundo: frontera subcortical</option>
+                            <option value="Seno sagital superior: trombosis venosa">Seno sagital superior: trombosis venosa</option>
+                            <option value="Seno sagital inferior: trombosis venosa">Seno sagital inferior: trombosis venosa</option>
+                            <option value="Seno recto: trombosis venosa profunda">Seno recto: trombosis venosa profunda</option>
+                            <option value="Vena de Galeno: vena cerebral magna">Vena de Galeno: vena cerebral magna</option>
+                            <option value="Venas cerebrales internas: sistema venoso profundo">Venas cerebrales internas: sistema venoso profundo</option>
+                            <option value="Seno transverso derecho">Seno transverso derecho</option>
+                            <option value="Seno transverso izquierdo">Seno transverso izquierdo</option>
+                            <option value="Seno sigmoideo derecho">Seno sigmoideo derecho</option>
+                            <option value="Seno sigmoideo izquierdo">Seno sigmoideo izquierdo</option>
+                            <option value="Seno cavernoso">Seno cavernoso</option>
+                            <option value="Vena yugular interna">Vena yugular interna</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label>Método recanalización</label>
+                        <select name="metodo_recanalizacion">
+                            <option value="">Sin especificar</option>
+                            <option value="aspiracion">Aspiración</option>
+                            <option value="traccion">Tracción</option>
+                            <option value="ambos">Ambos</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label>TICI</label>
+                        <select name="tici">
+                            <option value="">Sin especificar</option>
+                            <option value="0">0</option>
+                            <option value="1">1</option>
+                            <option value="2a">2a</option>
+                            <option value="2b">2b</option>
+                            <option value="3">3</option>
+                        </select>
+                    </div>
+                </div>
+
+                <button type="submit">Agregar sitio de oclusión</button>
+            </form>
+        </div>
+
+
+</div>
+
+
+<div class="card" id="participantes">
+    <h2 class="card-title">Participantes</h2>
+    <!-- ANGIO-PARTICIPANTES-FORCE-V3 -->
+
+    {% if procedimiento.participantes %}
+    <div class="structured-list">
+        {% for participante in procedimiento.participantes %}
+        <div class="structured-item">
+            <div>
+                <b>{{ participante.nombre or "Sin nombre" }}</b>
+                <div class="small muted">
+                    Rol: {{ participante.rol or "Sin especificar" }}
+                    · Fellow: {% if participante.es_fellow %}Sí{% else %}No{% endif %}
+                    {% if participante.notas %} · {{ participante.notas }}{% endif %}
+                </div>
+            </div>
+
+            <form method="post" action="/procedimientos/{{ procedimiento.id }}/participantes/{{ participante.id }}/eliminar" onsubmit="return confirm('¿Eliminar participante?');">
+                <button type="submit" class="btn btn-small btn-danger">Eliminar</button>
+            </form>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p class="muted small">Sin participantes agregados.</p>
+    {% endif %}
+
+    <form method="post" action="/procedimientos/{{ procedimiento.id }}/participantes/agregar" class="structured-add-form">
+        <div class="four">
+            <div>
+                <label>Nombre</label>
+                <input name="nombre" placeholder="Dr / integrante">
+            </div>
+
             <div>
                 <label>Rol</label>
-                <input name="rol" list="roles_procedimiento" placeholder="Ej: primer_operador" required>
-                <datalist id="roles_procedimiento">
-                    {% for item in sugerencias_roles %}
-                    <option value="{{ item }}">
-                    {% endfor %}
-                </datalist>
+                <select name="rol">
+                    <option value="">Sin especificar</option>
+                    <option value="1er operador">1er operador</option>
+                    <option value="2do operador">2do operador</option>
+                    <option value="3er operador">3er operador</option>
+                    <option value="4to operador">4to operador</option>
+                    <option value="Asistente">Asistente</option>
+                </select>
             </div>
+
+            <div>
+                <label>¿Es fellow?</label>
+                <select name="es_fellow">
+                    <option value="">No</option>
+                    <option value="1">Sí</option>
+                </select>
+            </div>
+
             <div>
                 <label>Notas</label>
                 <input name="notas" placeholder="Opcional">
             </div>
         </div>
+
         <button type="submit">Agregar participante</button>
     </form>
 </div>
 
-<div class="card">
-    <h2 class="card-title">Materiales estructurados</h2>
 
-    {% if materiales %}
-        <table>
-            <thead>
-                <tr>
-                    <th>Nombre</th>
-                    <th>Tipo</th>
-                    <th>Cantidad</th>
-                    <th>Notas</th>
-                    <th>Acción</th>
-                </tr>
-            </thead>
-            <tbody>
-            {% for material in materiales %}
-                <tr>
-                    <td>{{ material.nombre }}</td>
-                    <td>{{ material.tipo_material or "" }}</td>
-                    <td>{{ material.cantidad or "" }}</td>
-                    <td>{{ material.notas or "" }}</td>
-                    <td>
-                        <form method="post" action="/procedimientos/{{ procedimiento.id }}/materiales/{{ material.id }}/eliminar" onsubmit="return confirm('¿Eliminar este material del caso?');">
-                            <button type="submit" class="btn-danger btn-small">Eliminar</button>
-                        </form>
-                    </td>
-                </tr>
-            {% endfor %}
-            </tbody>
-        </table>
-    {% else %}
-        <p class="small">Aún no hay materiales estructurados.</p>
-    {% endif %}
-    <form method="post" action="/procedimientos/{{ procedimiento.id }}/materiales/agregar" class="inline-form">
-        <div class="four">
+
+<div class="card" id="materiales">
+    <h2 class="card-title">Materiales del procedimiento</h2>
+    <!-- ANGIO-MATERIALES-DEDICADOS-V4 -->
+
+    {% if procedimiento.materiales_procedimiento %}
+    <div class="structured-list">
+        {% for material in procedimiento.materiales_procedimiento %}
+        <div class="structured-item">
             <div>
-                <label>Nombre</label>
-                <input name="nombre" list="materiales_usados_sugeridos" placeholder="Nombre del material" required>
-                <datalist id="materiales_usados_sugeridos">
-                    {% for item in sugerencias_materiales %}
-                    <option value="{{ item }}">
-                    {% endfor %}
-                </datalist>
+                <b>{{ material.nombre or "Material sin nombre" }}</b>
+                <div class="small muted">
+                    Tipo: {{ material.tipo or "Sin especificar" }}
+                    · Tamaño: {{ material.tamano or "Sin especificar" }}
+                    · Marca: {{ material.marca or "Sin especificar" }}
+                    {% if material.notas %} · {{ material.notas }}{% endif %}
+                </div>
             </div>
+
+            <form method="post" action="/procedimientos/{{ procedimiento.id }}/materiales/{{ material.id }}/eliminar" onsubmit="return confirm('¿Eliminar material?');">
+                <button type="submit" class="btn btn-small btn-danger">Eliminar</button>
+            </form>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p class="muted small">Sin materiales agregados.</p>
+    {% endif %}
+
+    <form method="post" action="/procedimientos/{{ procedimiento.id }}/materiales/agregar" class="structured-add-form">
+        <div class="five">
             <div>
                 <label>Tipo</label>
-                <input name="tipo_material" list="tipos_material" placeholder="Ej: cateter_intermedio">
-                <datalist id="tipos_material">
-                    {% for item in sugerencias_tipos_material %}
-                    <option value="{{ item }}">
-                    {% endfor %}
-                </datalist>
+                <input name="tipo" placeholder="Ej: microcatéter, stent, coil">
             </div>
+
             <div>
-                <label>Cantidad</label>
-                <input name="cantidad" value="1">
+                <label>Nombre</label>
+                <input name="nombre" placeholder="Nombre comercial">
             </div>
+
+            <div>
+                <label>Tamaño</label>
+                <input name="tamano" placeholder="Ej: 4 x 20 mm">
+            </div>
+
+            <div>
+                <label>Marca</label>
+                <input name="marca" placeholder="Marca">
+            </div>
+
             <div>
                 <label>Notas</label>
                 <input name="notas" placeholder="Opcional">
             </div>
         </div>
+
         <button type="submit">Agregar material</button>
     </form>
 </div>
@@ -884,6 +1235,270 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     }
 });
+</script>
+
+
+
+<!-- ANGIO-STROKE-TIEMPO-JS-V1 -->
+<script>
+(function () {
+    function calcularMinutos() {
+        const puncion = document.getElementById("acvHoraPuncion");
+        const recanalizacion = document.getElementById("acvHoraRecanalizacion");
+        const salida = document.getElementById("acvTiempoPuncionRecanalizacion");
+
+        if (!puncion || !recanalizacion || !salida) return;
+        if (!puncion.value || !recanalizacion.value) {
+            salida.value = "";
+            return;
+        }
+
+        const a = new Date(puncion.value);
+        const b = new Date(recanalizacion.value);
+
+        if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime())) {
+            salida.value = "";
+            return;
+        }
+
+        const minutos = Math.round((b.getTime() - a.getTime()) / 60000);
+
+        if (minutos < 0 || minutos > 1440) {
+            salida.value = "";
+            return;
+        }
+
+        salida.value = String(minutos);
+    }
+
+    document.addEventListener("DOMContentLoaded", function () {
+        const puncion = document.getElementById("acvHoraPuncion");
+        const recanalizacion = document.getElementById("acvHoraRecanalizacion");
+
+        if (puncion) {
+            puncion.addEventListener("input", calcularMinutos);
+            puncion.addEventListener("change", calcularMinutos);
+        }
+
+        if (recanalizacion) {
+            recanalizacion.addEventListener("input", calcularMinutos);
+            recanalizacion.addEventListener("change", calcularMinutos);
+        }
+
+        calcularMinutos();
+    });
+})();
+</script>
+
+
+<!-- ANGIO-STROKE-DATOS-CLINICOS-V2-JS -->
+<script>
+(function () {
+    function pad2(n) {
+        return String(n).padStart(2, "0");
+    }
+
+    function formatDate(date) {
+        return date.getFullYear() + "-" + pad2(date.getMonth() + 1) + "-" + pad2(date.getDate());
+    }
+
+    function getBaseProcedureDate() {
+        const proc = document.getElementById("fecha_procedimiento");
+        if (proc && proc.value) return new Date(proc.value + "T00:00:00");
+        return new Date();
+    }
+
+    function setDateByMode(button) {
+        const targetId = button.dataset.target;
+        const target = document.getElementById(targetId);
+        if (!target) return;
+
+        let date = getBaseProcedureDate();
+
+        if (button.dataset.mode === "today") {
+            date = new Date();
+        }
+
+        if (button.dataset.mode === "procedure") {
+            date = getBaseProcedureDate();
+        }
+
+        if (button.dataset.mode === "plus-days") {
+            date.setDate(date.getDate() + Number(button.dataset.days || "0"));
+        }
+
+        if (button.dataset.mode === "plus-months") {
+            date.setMonth(date.getMonth() + Number(button.dataset.months || "0"));
+        }
+
+        if (button.dataset.mode === "plus-years") {
+            date.setFullYear(date.getFullYear() + Number(button.dataset.years || "0"));
+        }
+
+        target.value = formatDate(date);
+        target.dispatchEvent(new Event("input", { bubbles: true }));
+        target.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+
+    document.addEventListener("click", function (event) {
+        const button = event.target.closest(".quick-date-btn");
+        if (!button) return;
+        event.preventDefault();
+        setDateByMode(button);
+    });
+
+    document.addEventListener("DOMContentLoaded", function () {
+        const preset = document.getElementById("acvOclusionPreset");
+        const texto = document.getElementById("acvNivelOclusion");
+
+        if (preset && texto) {
+            preset.addEventListener("change", function () {
+                if (!preset.value) return;
+                texto.value = preset.value;
+                texto.dispatchEvent(new Event("input", { bubbles: true }));
+                texto.dispatchEvent(new Event("change", { bubbles: true }));
+            });
+        }
+    });
+})();
+</script>
+
+
+<!-- ANGIO-CASE-COLLAPSIBLE-SECTIONS-V3 -->
+<script>
+(function () {
+    const pageKey = "angiopacs:case-sections:" + window.location.pathname;
+    const scrollKey = "angiopacs:scroll:" + window.location.pathname;
+
+    function normalizarTitulo(texto) {
+        return (texto || "")
+            .replace("▾", "")
+            .replace("▸", "")
+            .trim()
+            .toLowerCase()
+            .replace(/\s+/g, "-")
+            .replace(/[^a-z0-9áéíóúñü_-]/gi, "");
+    }
+
+    function iniciarColapsables() {
+        const cards = document.querySelectorAll("body.procedimiento-detail-mobile-ready main.container > .card");
+
+        cards.forEach(function (card) {
+            if (card.classList.contains("case-summary-card")) return;
+            if (card.classList.contains("case-section-ready-v3")) return;
+
+            let title = card.querySelector(":scope > .card-title, :scope > h2, :scope > h1, :scope > .case-section-toggle");
+            if (!title) return;
+
+            let titleText = (title.textContent || "")
+                .replace("▾", "")
+                .replace("▸", "")
+                .trim();
+
+            if (!titleText) return;
+
+            let body = card.querySelector(":scope > .case-section-body");
+
+            if (!body) {
+                body = document.createElement("div");
+                body.className = "case-section-body";
+
+                let node = title.nextSibling;
+                while (node) {
+                    const next = node.nextSibling;
+                    body.appendChild(node);
+                    node = next;
+                }
+            }
+
+            let button;
+
+            if (title.classList && title.classList.contains("case-section-toggle")) {
+                button = title;
+            } else {
+                button = document.createElement("button");
+                button.type = "button";
+                button.className = "case-section-toggle";
+                title.replaceWith(button);
+            }
+
+            button.type = "button";
+            button.innerHTML =
+                '<span class="case-section-title"></span>' +
+                '<span class="case-section-chevron">▾</span>';
+            button.querySelector(".case-section-title").textContent = titleText;
+
+            if (!body.parentElement || body.parentElement !== card) {
+                card.appendChild(body);
+            }
+
+            const sectionKey = pageKey + ":" + normalizarTitulo(titleText);
+            const savedCollapsed = localStorage.getItem(sectionKey) === "1";
+
+            card.classList.add("case-section-ready-v3");
+
+            function aplicarEstado(colapsado) {
+                body.hidden = colapsado;
+                card.classList.toggle("case-section-collapsed", colapsado);
+                card.classList.toggle("case-section-open", !colapsado);
+                button.setAttribute("aria-expanded", colapsado ? "false" : "true");
+
+                const chev = button.querySelector(".case-section-chevron");
+                if (chev) {
+                    chev.textContent = colapsado ? "▸" : "▾";
+                }
+
+                localStorage.setItem(sectionKey, colapsado ? "1" : "0");
+            }
+
+            aplicarEstado(savedCollapsed);
+
+            button.addEventListener("click", function (event) {
+                event.preventDefault();
+                event.stopPropagation();
+
+                const nuevoEstado = !body.hidden;
+                aplicarEstado(nuevoEstado);
+            });
+        });
+    }
+
+    function guardarScrollAntesDeSubmit() {
+        document.addEventListener("submit", function () {
+            try {
+                sessionStorage.setItem(scrollKey, String(window.scrollY || 0));
+            } catch (e) {}
+        }, true);
+    }
+
+    function restaurarScroll() {
+        try {
+            const value = sessionStorage.getItem(scrollKey);
+            if (!value) return;
+
+            sessionStorage.removeItem(scrollKey);
+
+            const y = Number(value);
+            if (!Number.isFinite(y)) return;
+
+            setTimeout(function () {
+                window.scrollTo({ top: y, behavior: "auto" });
+            }, 80);
+        } catch (e) {}
+    }
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", function () {
+            iniciarColapsables();
+            guardarScrollAntesDeSubmit();
+            restaurarScroll();
+        });
+    } else {
+        iniciarColapsables();
+        guardarScrollAntesDeSubmit();
+        restaurarScroll();
+    }
+})();
 </script>
 
 </body>

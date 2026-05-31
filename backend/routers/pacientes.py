@@ -10,7 +10,7 @@ import zipfile
 import json
 import unicodedata
 from urllib.parse import unquote
-from datetime import datetime, timezone, timezone
+from datetime import datetime, timezone, date
 from zoneinfo import ZoneInfo
 from services.orthanc_service import subir_dicom_a_orthanc
 from services.audit_service import start_task, finish_task, log_upload_file, log_zip_summary, log_global, log_case, log_case, log_global
@@ -18,7 +18,7 @@ from services.audit_service import start_task, finish_task, log_upload_file, log
 
 
 from database import get_db
-from models import Procedimiento, Archivo, ParticipanteProcedimiento, MaterialProcedimiento, EstudioDICOM, SugerenciaIA, RepositorioTag, AuditoriaEvento
+from models import Procedimiento, Archivo, ParticipanteProcedimiento, MaterialProcedimiento, EstudioDICOM, SugerenciaIA, RepositorioTag, AuditoriaEvento, SitioOclusion
 
 ORTHANC_PUBLIC_URL = os.getenv("ORTHANC_PUBLIC_URL", "http://localhost:8042")
 
@@ -660,6 +660,28 @@ def fusionar_tag_repositorio(
 
 
 
+
+
+# ANGIO-NUEVO-CASO-EDAD-BACKEND-V1
+def calcular_edad_desde_fecha_nacimiento(fecha_nacimiento):
+    """
+    Calcula edad en años completos desde una fecha de nacimiento tipo date.
+    Retorna None si no hay fecha o si el resultado no es plausible.
+    """
+    if not fecha_nacimiento:
+        return None
+
+    hoy = date.today()
+    edad = hoy.year - fecha_nacimiento.year - (
+        (hoy.month, hoy.day) < (fecha_nacimiento.month, fecha_nacimiento.day)
+    )
+
+    if edad < 0 or edad > 130:
+        return None
+
+    return edad
+
+
 @router.get("/nuevo-caso")
 def nuevo_caso_get(
     request: Request,
@@ -698,24 +720,29 @@ def nuevo_caso_post(
     presentacion_clinica: str = Form(None),
     db: Session = Depends(get_db)
 ):
-    edad_int = int(edad) if edad and edad.isdigit() else None
+    fecha_nacimiento_dt = parse_date_or_none(paciente_fecha_nacimiento)
+    edad_int = calcular_edad_desde_fecha_nacimiento(fecha_nacimiento_dt)
+
+    # Fallback defensivo si el frontend envía edad sin fecha de nacimiento.
+    if edad_int is None:
+        edad_int = int(edad) if edad and edad.isdigit() else None
 
     procedimiento = Procedimiento(
         paciente_nombre=paciente_nombre.strip() if paciente_nombre else None,
         paciente_apellido=paciente_apellido.strip() if paciente_apellido else None,
         paciente_sexo=paciente_sexo.strip() if paciente_sexo else None,
-        paciente_fecha_nacimiento=parse_date_or_none(paciente_fecha_nacimiento),
+        paciente_fecha_nacimiento=fecha_nacimiento_dt,
         paciente_id=paciente_id.strip() if paciente_id else None,
-        paciente_mail=paciente_mail.strip() if paciente_mail else None,
-        paciente_telefono=paciente_telefono.strip() if paciente_telefono else None,
+        paciente_mail=None,
+        paciente_telefono=None,
         estado_caso=estado_caso.strip() if estado_caso else "abierto",
         edad=edad_int,
-        historia_clinica=historia_clinica.strip() if historia_clinica else None,
+        historia_clinica=None,
         institucion=institucion.strip() if institucion else None,
         fecha=parse_date_or_none(fecha),
-        procedimiento=procedimiento_txt.strip() if procedimiento_txt else None,
-        diagnostico=diagnostico.strip() if diagnostico else None,
-        presentacion_clinica=presentacion_clinica.strip() if presentacion_clinica else None,
+        procedimiento=None,
+        diagnostico=None,
+        presentacion_clinica=None,
     )
 
     db.add(procedimiento)
@@ -724,7 +751,6 @@ def nuevo_caso_post(
 
     if "asegurar_tag" in globals():
         asegurar_tag(db, "institucion", institucion)
-        asegurar_tag(db, "procedimiento", procedimiento_txt)
 
     log_case(
         procedimiento.id,
@@ -883,140 +909,92 @@ def ver_procedimiento(
     )
 
 
-@router.post("/procedimientos/{procedimiento_id}/participantes/agregar")
-async def agregar_participante_procedimiento(
+
+
+# ANGIO-OCLUSIONES-MULTIPLES-LIMPIO-V1
+@router.post("/procedimientos/{procedimiento_id}/oclusiones/agregar")
+async def agregar_sitio_occlusion(
     procedimiento_id: int,
     request: Request,
-    nombre: str = Form(...),
-    rol: str = Form(...),
-    notas: str = Form(None),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
-    procedimiento = db.query(Procedimiento).filter(Procedimiento.id == procedimiento_id).first()
+    form = await request.form()
 
-    if not procedimiento:
-        raise HTTPException(status_code=404, detail="Procedimiento no encontrado")
+    lateralidad = (form.get("lateralidad") or "").strip() or None
+    sitio_anatomico = (form.get("sitio_anatomico") or "").strip() or None
+    metodo_recanalizacion = (form.get("metodo_recanalizacion") or "").strip() or None
+    tici = (form.get("tici") or "").strip() or None
 
-    participante = ParticipanteProcedimiento(
-        procedimiento_id=procedimiento_id,
-        nombre=nombre,
-        rol=rol,
-        notas=notas,
-    )
+    if lateralidad or sitio_anatomico or metodo_recanalizacion or tici:
+        item = SitioOclusion(
+            procedimiento_id=procedimiento_id,
+            lateralidad=lateralidad,
+            sitio_anatomico=sitio_anatomico,
+            metodo_recanalizacion=metodo_recanalizacion,
+            tici=tici,
+        )
+        db.add(item)
+        db.commit()
 
-    db.add(participante)
-    db.commit()
-
-    asegurar_tag(db, "persona", nombre)
-    asegurar_tag(db, "rol_procedimiento", rol)
+        try:
+            registrar_auditoria(
+                db=db,
+                request=request,
+                accion="OCLUSION_SITE_ADDED",
+                tarea="stroke",
+                estado="ok",
+                detalle=f"procedimiento_id={procedimiento_id}; sitio={sitio_anatomico or ''}; lateralidad={lateralidad or ''}; metodo={metodo_recanalizacion or ''}; tici={tici or ''}",
+            )
+        except Exception:
+            pass
 
     return RedirectResponse(
-        url=f"/procedimientos/{procedimiento_id}",
-        status_code=303
+        url=f"/procedimientos/{procedimiento_id}#stroke",
+        status_code=303,
     )
 
 
-@router.post("/procedimientos/{procedimiento_id}/materiales/agregar")
-async def agregar_material_procedimiento(
+@router.post("/procedimientos/{procedimiento_id}/oclusiones/{oclusion_id}/eliminar")
+async def eliminar_sitio_occlusion(
     procedimiento_id: int,
+    oclusion_id: int,
     request: Request,
-    nombre: str = Form(...),
-    tipo_material: str = Form(None),
-    cantidad: str = Form("1"),
-    notas: str = Form(None),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
-    procedimiento = db.query(Procedimiento).filter(Procedimiento.id == procedimiento_id).first()
-
-    if not procedimiento:
-        raise HTTPException(status_code=404, detail="Procedimiento no encontrado")
-
-    cantidad_int = int(cantidad) if cantidad and cantidad.isdigit() else 1
-
-    material = MaterialProcedimiento(
-        procedimiento_id=procedimiento_id,
-        nombre=nombre,
-        tipo_material=tipo_material,
-        cantidad=cantidad_int,
-        notas=notas,
-    )
-
-    db.add(material)
-    db.commit()
-
-    asegurar_tag(db, "material", nombre)
-    asegurar_tag(db, "tipo_material", tipo_material)
-
-    return RedirectResponse(
-        url=f"/procedimientos/{procedimiento_id}",
-        status_code=303
-    )
-
-
-
-@router.post("/procedimientos/{procedimiento_id}/participantes/{participante_id}/eliminar")
-def eliminar_participante_procedimiento(
-    procedimiento_id: int,
-    participante_id: int,
-    request: Request,
-    db: Session = Depends(get_db)
-):
-    participante = (
-        db.query(ParticipanteProcedimiento)
+    item = (
+        db.query(SitioOclusion)
         .filter(
-            ParticipanteProcedimiento.id == participante_id,
-            ParticipanteProcedimiento.procedimiento_id == procedimiento_id,
+            SitioOclusion.id == oclusion_id,
+            SitioOclusion.procedimiento_id == procedimiento_id,
         )
         .first()
     )
 
-    if not participante:
-        raise HTTPException(status_code=404, detail="Participante no encontrado")
+    if item:
+        detalle = f"procedimiento_id={procedimiento_id}; sitio={item.sitio_anatomico or ''}; lateralidad={item.lateralidad or ''}; metodo={item.metodo_recanalizacion or ''}; tici={item.tici or ''}"
 
-    db.delete(participante)
-    db.commit()
+        db.delete(item)
+        db.commit()
 
-    log_case(
-        procedimiento_id,
-        "CASE_UPDATED",
-        request=request,
-        db=db,
-        detalle="ficha_del_caso_actualizada"
-    )
-    db.commit()
-
-    return RedirectResponse(
-        url=f"/procedimientos/{procedimiento_id}",
-        status_code=303
-    )
-
-
-@router.post("/procedimientos/{procedimiento_id}/materiales/{material_id}/eliminar")
-def eliminar_material_procedimiento(
-    procedimiento_id: int,
-    material_id: int,
-    request: Request,
-    db: Session = Depends(get_db)
-):
-    material = (
-        db.query(MaterialProcedimiento)
-        .filter(
-            MaterialProcedimiento.id == material_id,
-            MaterialProcedimiento.procedimiento_id == procedimiento_id,
-        )
-        .first()
-    )
-
-    if not material:
-        raise HTTPException(status_code=404, detail="Material no encontrado")
-
-    db.delete(material)
-    db.commit()
+        try:
+            registrar_auditoria(
+                db=db,
+                request=request,
+                accion="OCLUSION_SITE_DELETED",
+                tarea="stroke",
+                estado="ok",
+                detalle=detalle,
+            )
+        except Exception:
+            pass
 
     return RedirectResponse(
-        url=f"/procedimientos/{procedimiento_id}",
-        status_code=303
+        url=f"/procedimientos/{procedimiento_id}#stroke",
+        status_code=303,
     )
+
+
+
 
 
 @router.post("/procedimientos/{procedimiento_id}/editar")
@@ -1063,45 +1041,157 @@ async def editar_procedimiento(
     if not p:
         raise HTTPException(status_code=404, detail="Procedimiento no encontrado")
 
-    p.lugar = lugar
-    p.historia_clinica = historia_clinica
-    p.paciente_nombre = paciente_nombre
-    p.paciente_apellido = paciente_apellido
-    p.paciente_sexo = paciente_sexo
-    p.paciente_fecha_nacimiento = parse_date_or_none(paciente_fecha_nacimiento)
-    p.paciente_id = paciente_id
-    p.paciente_mail = paciente_mail.strip() if paciente_mail else None
-    p.paciente_telefono = paciente_telefono.strip() if paciente_telefono else None
-    p.estado_caso = estado_caso.strip() if estado_caso else "abierto"
-    p.fecha = parse_date_or_none(fecha)
-    p.proxima_visita_agendada = parse_date_or_none(proxima_visita_agendada)
-    p.institucion = institucion.strip() if institucion else None
+    form_data = await request.form()
+
+    def enviado(nombre: str) -> bool:
+        return nombre in form_data
+
+    def texto(nombre: str):
+        valor = form_data.get(nombre)
+        if valor is None:
+            return None
+        valor = str(valor).strip()
+        return valor if valor else None
+
+    def set_texto(atributo: str, nombre: str | None = None):
+        nombre = nombre or atributo
+        if enviado(nombre):
+            setattr(p, atributo, texto(nombre))
+
+    def set_fecha(atributo: str, nombre: str | None = None):
+        nombre = nombre or atributo
+        if enviado(nombre):
+            setattr(p, atributo, parse_date_or_none(form_data.get(nombre)))
+
+    def set_datetime(atributo: str, nombre: str | None = None):
+        nombre = nombre or atributo
+        if enviado(nombre):
+            setattr(p, atributo, parse_datetime_local_or_none(form_data.get(nombre)))
+
+    def set_int(atributo: str, nombre: str | None = None):
+        nombre = nombre or atributo
+        if enviado(nombre):
+            setattr(p, atributo, parse_int_or_none(form_data.get(nombre)))
+
+    def set_bool_checkbox(atributo: str, nombre: str | None = None):
+        nombre = nombre or atributo
+        if enviado(nombre):
+            setattr(p, atributo, True)
+        elif any(k.startswith("acv_") for k in form_data.keys()):
+            setattr(p, atributo, False)
+
+    def set_float(atributo: str, nombre: str | None = None):
+        nombre = nombre or atributo
+        if enviado(nombre):
+            setattr(p, atributo, parse_float_or_none(form_data.get(nombre)))
+
+    # Identificación paciente
+    set_texto("paciente_nombre")
+    set_texto("paciente_apellido")
+    set_texto("paciente_sexo")
+    set_fecha("paciente_fecha_nacimiento")
+    set_texto("paciente_id")
+    set_texto("paciente_mail")
+    set_texto("paciente_telefono")
+    set_texto("obra_social")
+
+    # Historia clínica queda legacy, pero ya no se edita desde la interfaz.
+    if enviado("historia_clinica"):
+        p.historia_clinica = None
+
+    if enviado("estado_caso"):
+        p.estado_caso = texto("estado_caso") or "abierto"
+
+    # Procedimiento
+    set_texto("lugar")
+    set_texto("institucion")
+    set_fecha("fecha")
+    set_texto("procedimiento_urgente")
+    set_texto("origen_paciente")
+    set_texto("tipo_procedimiento")
+    set_texto("procedimiento", "procedimiento_txt")
+    set_texto("diagnostico")
+    set_texto("localizacion")
+    set_texto("radiacion_dosis")
+    set_float("contraste_ml")
+
+    # Compatibilidad temporal: mantener localizacion_aneurisma sincronizada
+    # con el nuevo campo localizacion cuando venga desde formulario.
+    if enviado("localizacion"):
+        p.localizacion_aneurisma = texto("localizacion")
+
+    # Datos clínicos
+    set_texto("presentacion_clinica")
+    set_texto("informe_procedimiento")
+    set_texto("indicaciones")
+    set_fecha("proxima_visita_agendada")
+    set_fecha("fecha_ingreso")
+    set_fecha("fecha_alta")
+    set_texto("notas_adicionales")
+
+    # Complicaciones
+    set_texto("complicaciones_si_no")
+    set_texto("complicaciones")
+
+    # Stroke / trombectomía estructurado
+    if any(k.startswith("acv_") for k in form_data.keys()):
+        p.acv_activado = True
+
+    set_datetime("hora_inicio_sintomas", "acv_hora_inicio_sintomas")
+    set_int("acv_nih_inicial")
+    set_int("acv_nih_llegada")
+    set_int("acv_nih_postprocedimiento")
+    set_int("acv_aspects")
+    set_datetime("hora_llegada_paciente_angio", "acv_hora_llegada_paciente")
+    set_datetime("hora_puncion_femoral", "acv_hora_puncion")
+    set_datetime("acv_hora_recanalizacion")
+    set_texto("acv_lugar_acceso")
+    set_texto("acv_lateralidad")
+    set_texto("acv_nivel_oclusion")
+    set_texto("acv_tici")
+    set_texto("acv_modalidad_procedimiento")
+    set_bool_checkbox("acv_imagen_tc")
+    set_bool_checkbox("acv_imagen_rm")
+    set_bool_checkbox("acv_imagen_dsa")
+
+    if enviado("acv_hora_puncion") or enviado("acv_hora_recanalizacion"):
+        p.acv_tiempo_puncion_recanalizacion_minutos = calcular_minutos_entre(
+            p.hora_puncion_femoral,
+            p.acv_hora_recanalizacion,
+        )
+
+
+    # Campos legacy de participantes/materiales todavía presentes
+    set_texto("primer_operador")
+    set_texto("segundo_operador")
+    set_texto("fellow")
+    set_texto("vaina")
+    set_texto("cateter")
+    set_texto("cateter_intermedio")
+    set_texto("microcateter")
+    set_texto("guia")
+    set_texto("microguia")
+    set_texto("fd")
+    set_texto("materiales_usados")
+
+    if enviado("paciente_fecha_nacimiento") or enviado("fecha") or enviado("edad"):
+        try:
+            edad_calculada = calcular_edad(p.paciente_fecha_nacimiento, p.fecha)
+        except Exception:
+            edad_calculada = None
+
+        edad_form = texto("edad")
+        p.edad = edad_calculada if edad_calculada is not None else (
+            int(edad_form) if edad_form and edad_form.isdigit() else None
+        )
 
     if "asegurar_tag" in globals():
-        asegurar_tag(db, "institucion", institucion)
-
-    edad_calculada = calcular_edad(p.paciente_fecha_nacimiento, p.fecha)
-    p.edad = edad_calculada if edad_calculada is not None else (int(edad) if edad and edad.isdigit() else None)
-
-    p.procedimiento = procedimiento_txt
-    p.diagnostico = diagnostico
-    p.indicaciones = indicaciones
-    p.complicaciones_si_no = complicaciones_si_no
-    p.localizacion_aneurisma = localizacion_aneurisma
-    p.primer_operador = primer_operador
-    p.segundo_operador = segundo_operador
-    p.fellow = fellow
-    p.presentacion_clinica = presentacion_clinica
-    p.vaina = vaina
-    p.cateter = cateter
-    p.cateter_intermedio = cateter_intermedio
-    p.microcateter = microcateter
-    p.guia = guia
-    p.microguia = microguia
-    p.fd = fd
-    p.materiales_usados = materiales_usados
-    p.complicaciones = complicaciones
-    p.notas_adicionales = notas_adicionales
+        if enviado("institucion"):
+            asegurar_tag(db, "institucion", p.institucion)
+        if enviado("procedimiento_txt"):
+            asegurar_tag(db, "procedimiento", p.procedimiento)
+        if enviado("tipo_procedimiento"):
+            asegurar_tag(db, "tipo_procedimiento", p.tipo_procedimiento)
 
     db.commit()
 
@@ -3044,6 +3134,168 @@ def admin_casos_borrar_post(
 # ============================================================
 # ANGIO-044: galería de imágenes y videos del caso
 # ============================================================
+
+
+
+# ANGIO-PARTICIPANTES-MATERIALES-FORCE-V3
+@router.post("/procedimientos/{procedimiento_id}/participantes/agregar")
+async def agregar_participante_v3(
+    procedimiento_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    form = await request.form()
+
+    nombre = (form.get("nombre") or "").strip() or None
+    rol = (form.get("rol") or "").strip() or None
+    es_fellow = (form.get("es_fellow") or "").strip() == "1"
+    notas = (form.get("notas") or "").strip() or None
+
+    if nombre or rol or es_fellow or notas:
+        item = ParticipanteProcedimiento(
+            procedimiento_id=procedimiento_id,
+            nombre=nombre,
+            rol=rol,
+            es_fellow=es_fellow,
+            notas=notas,
+        )
+        db.add(item)
+        db.commit()
+
+        try:
+            registrar_auditoria(
+                db=db,
+                request=request,
+                accion="PARTICIPANTE_ADDED",
+                tarea="participantes",
+                estado="ok",
+                detalle=f"procedimiento_id={procedimiento_id}; nombre={nombre or ''}; rol={rol or ''}; fellow={es_fellow}",
+            )
+        except Exception:
+            pass
+
+    return RedirectResponse(url=f"/procedimientos/{procedimiento_id}#participantes", status_code=303)
+
+
+@router.post("/procedimientos/{procedimiento_id}/participantes/{participante_id}/eliminar")
+async def eliminar_participante_v3(
+    procedimiento_id: int,
+    participante_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    item = (
+        db.query(ParticipanteProcedimiento)
+        .filter(
+            ParticipanteProcedimiento.id == participante_id,
+            ParticipanteProcedimiento.procedimiento_id == procedimiento_id,
+        )
+        .first()
+    )
+
+    if item:
+        detalle = f"procedimiento_id={procedimiento_id}; nombre={getattr(item, 'nombre', '') or ''}; rol={getattr(item, 'rol', '') or ''}"
+        db.delete(item)
+        db.commit()
+
+        try:
+            registrar_auditoria(
+                db=db,
+                request=request,
+                accion="PARTICIPANTE_DELETED",
+                tarea="participantes",
+                estado="ok",
+                detalle=detalle,
+            )
+        except Exception:
+            pass
+
+    return RedirectResponse(url=f"/procedimientos/{procedimiento_id}#participantes", status_code=303)
+
+
+
+
+
+
+# ANGIO-MATERIALES-DEDICADOS-V4
+@router.post("/procedimientos/{procedimiento_id}/materiales/agregar")
+async def agregar_material_dedicado_v4(
+    procedimiento_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    form = await request.form()
+
+    tipo = (form.get("tipo") or "").strip() or None
+    nombre = (form.get("nombre") or "").strip() or None
+    tamano = (form.get("tamano") or "").strip() or None
+    marca = (form.get("marca") or "").strip() or None
+    notas = (form.get("notas") or "").strip() or None
+
+    if tipo or nombre or tamano or marca or notas:
+        item = MaterialProcedimiento(
+            procedimiento_id=procedimiento_id,
+            tipo=tipo,
+            tipo_material=tipo,
+            nombre=nombre,
+            tamano=tamano,
+            marca=marca,
+            cantidad=1,
+            notas=notas,
+        )
+        db.add(item)
+        db.commit()
+
+        try:
+            registrar_auditoria(
+                db=db,
+                request=request,
+                accion="MATERIAL_ADDED",
+                tarea="materiales",
+                estado="ok",
+                detalle=f"procedimiento_id={procedimiento_id}; tipo={tipo or ''}; nombre={nombre or ''}; tamano={tamano or ''}; marca={marca or ''}",
+            )
+        except Exception:
+            pass
+
+    return RedirectResponse(url=f"/procedimientos/{procedimiento_id}#materiales", status_code=303)
+
+
+@router.post("/procedimientos/{procedimiento_id}/materiales/{material_id}/eliminar")
+async def eliminar_material_dedicado_v4(
+    procedimiento_id: int,
+    material_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    item = (
+        db.query(MaterialProcedimiento)
+        .filter(
+            MaterialProcedimiento.id == material_id,
+            MaterialProcedimiento.procedimiento_id == procedimiento_id,
+        )
+        .first()
+    )
+
+    if item:
+        detalle = f"procedimiento_id={procedimiento_id}; tipo={item.tipo or ''}; nombre={item.nombre or ''}; tamano={item.tamano or ''}; marca={item.marca or ''}"
+        db.delete(item)
+        db.commit()
+
+        try:
+            registrar_auditoria(
+                db=db,
+                request=request,
+                accion="MATERIAL_DELETED",
+                tarea="materiales",
+                estado="ok",
+                detalle=detalle,
+            )
+        except Exception:
+            pass
+
+    return RedirectResponse(url=f"/procedimientos/{procedimiento_id}#materiales", status_code=303)
+
 
 @router.get("/procedimientos/{procedimiento_id}/galeria")
 def galeria_archivos_caso(

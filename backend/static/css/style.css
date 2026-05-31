@@ -2380,3 +2380,487 @@ button:hover {
     font-size: 17px !important;
   }
 }
+
+/* =========================================================
+   ANGIO-CASE-COLLAPSIBLE-SECTIONS-V1
+   Ficha de caso: estado arriba derecha + secciones colapsables
+   ========================================================= */
+
+.case-summary-card {
+  position: relative;
+  padding-right: 170px;
+}
+
+.case-status-corner {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  z-index: 2;
+}
+
+.case-status-badge {
+  display: inline-block;
+  padding: 7px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: var(--blue-100);
+  color: var(--navy-900);
+  border: 1px solid rgba(16, 32, 51, 0.15);
+}
+
+.case-status-abierto {
+  background: var(--green-100);
+  color: var(--green-600);
+}
+
+.case-status-hospitalizado {
+  background: var(--amber-100);
+  color: var(--amber-600);
+}
+
+.case-status-pendiente_control {
+  background: var(--blue-100);
+  color: var(--blue-600);
+}
+
+.case-status-de_alta {
+  background: rgba(255,255,255,0.86);
+  color: var(--muted);
+}
+
+.case-section-ready {
+  padding-top: 0;
+  overflow: hidden;
+}
+
+.case-section-toggle {
+  width: calc(100% + 44px) !important;
+  margin: 0 -22px 18px !important;
+  padding: 16px 22px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  border-bottom: 1px solid rgba(16, 32, 51, 0.10) !important;
+  background: rgba(255,255,255,0.36) !important;
+  color: var(--text) !important;
+  box-shadow: none !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 12px !important;
+  text-align: left !important;
+  cursor: pointer !important;
+}
+
+.case-section-toggle:hover {
+  background: rgba(231, 242, 245, 0.85) !important;
+}
+
+.case-section-title {
+  font-size: 19px;
+  font-weight: 900;
+  line-height: 1.2;
+}
+
+.case-section-chevron {
+  font-size: 20px;
+  font-weight: 900;
+  transition: transform 0.16s ease;
+}
+
+.case-section-collapsed .case-section-body {
+  display: none !important;
+}
+
+.case-section-collapsed .case-section-chevron {
+  transform: rotate(-90deg);
+}
+
+@media (max-width: 700px) {
+
+  .case-summary-card {
+    padding-right: 14px !important;
+    padding-top: 54px !important;
+  }
+
+  .case-status-corner {
+    top: 12px;
+    right: 12px;
+  }
+
+  .case-status-badge {
+    font-size: 11px;
+    padding: 6px 10px;
+  }
+
+  .case-section-toggle {
+    width: calc(100% + 28px) !important;
+    margin: 0 -14px 12px !important;
+    padding: 13px 14px !important;
+  }
+
+  .case-section-title {
+    font-size: 17px;
+  }
+}
+
+/* =========================================================
+   ANGIO-CASE-COLLAPSE-FIX-V2
+   Colapso robusto de ficha de caso
+   ========================================================= */
+
+.case-section-body[hidden] {
+  display: none !important;
+}
+
+.case-section-ready-v2 {
+  padding-top: 0;
+  overflow: hidden;
+}
+
+.case-section-ready-v2 .case-section-toggle {
+  width: calc(100% + 44px) !important;
+  margin: 0 -22px 18px !important;
+  padding: 16px 22px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  border-bottom: 1px solid rgba(16, 32, 51, 0.10) !important;
+  background: rgba(95, 163, 189, 0.96) !important;
+  color: #ffffff !important;
+  box-shadow: 0 8px 18px rgba(47,145,183,0.20) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 12px !important;
+  text-align: left !important;
+  cursor: pointer !important;
+}
+
+.case-section-ready-v2 .case-section-toggle:hover {
+  background: var(--navy-800) !important;
+}
+
+.case-section-ready-v2 .case-section-title {
+  font-size: 16px;
+  font-weight: 900;
+  line-height: 1.2;
+}
+
+.case-section-ready-v2 .case-section-chevron {
+  font-size: 17px;
+  font-weight: 900;
+}
+
+@media (max-width: 700px) {
+
+  .case-section-ready-v2 .case-section-toggle {
+    width: calc(100% + 28px) !important;
+    margin: 0 -14px 12px !important;
+    padding: 13px 14px !important;
+  }
+
+  .case-section-ready-v2 .case-section-title {
+    font-size: 15px;
+  }
+}
+
+/* =========================================================
+   ANGIO-ESTADO-CASO-V2
+   Estados de caso actualizados
+   ========================================================= */
+
+.case-status-pendiente_control_ambulatorio,
+.estado-pendiente_control_ambulatorio,
+.badge-pendiente_control_ambulatorio {
+  background: var(--blue-100) !important;
+  color: var(--blue-600) !important;
+}
+
+.case-status-cerrado,
+.estado-cerrado,
+.badge-cerrado {
+  background: rgba(255,255,255,0.88) !important;
+  color: var(--muted) !important;
+}
+
+.case-status-hospitalizado,
+.estado-hospitalizado,
+.badge-hospitalizado {
+  background: var(--amber-100) !important;
+  color: var(--amber-600) !important;
+}
+
+/* =========================================================
+   ANGIO-STROKE-DATOS-CLINICOS-V2
+   Botones rápidos de fechas y Stroke V2
+   ========================================================= */
+
+.quick-date-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 8px;
+}
+
+.quick-date-row .btn,
+.quick-date-row button {
+  width: auto !important;
+  min-height: 30px !important;
+  padding: 6px 9px !important;
+  font-size: 12px !important;
+  border-radius: 999px !important;
+  margin-bottom: 0 !important;
+}
+
+.inline-checks input[type="checkbox"] {
+  width: auto;
+  margin-right: 6px;
+}
+
+@media (max-width: 700px) {
+  .quick-date-row {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .quick-date-row .btn,
+  .quick-date-row button {
+    width: 100% !important;
+  }
+}
+
+/* =========================================================
+   ANGIO-FIELD-HELP-V3
+   Ayudas breves bajo campos clínicos
+   ========================================================= */
+
+.field-help {
+  margin: -3px 0 8px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+@media (max-width: 700px) {
+  .field-help {
+    font-size: 12px;
+    margin-bottom: 8px;
+  }
+}
+
+/* =========================================================
+   ANGIO-OCLUSIONES-MULTIPLES-LIMPIO-V1
+   Sitios múltiples de oclusión
+   ========================================================= */
+
+.four {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(150px, 1fr));
+  gap: 14px;
+}
+
+.occlusion-sites-box {
+  margin-top: 16px;
+  padding: 14px;
+  border: 1px solid rgba(16, 32, 51, 0.12);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.occlusion-sites-box h3 {
+  margin: 0 0 6px;
+  font-size: 18px;
+}
+
+.occlusion-list {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0 14px;
+}
+
+.occlusion-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(255, 250, 240, 0.92);
+  border: 1px solid rgba(16, 32, 51, 0.10);
+}
+
+.btn-danger {
+  background: var(--red-600) !important;
+  color: #fff !important;
+}
+
+@media (max-width: 900px) {
+  .four {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 700px) {
+  .four {
+    grid-template-columns: 1fr;
+  }
+
+  .occlusion-item {
+    grid-template-columns: 1fr;
+  }
+
+  .occlusion-item form button {
+    width: 100% !important;
+  }
+}
+
+/* =========================================================
+   ANGIO-STROKE-FORM-FIX-V4
+   Stroke: TICI solo por sitio + imágenes diagnósticas claras
+   ========================================================= */
+
+.diagnostic-images-box {
+  margin: 14px 0 10px;
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.28);
+  border: 1px solid rgba(16, 32, 51, 0.10);
+}
+
+.diagnostic-checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 8px 0 10px;
+}
+
+.diagnostic-check {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(255, 250, 240, 0.92);
+  border: 1px solid rgba(16, 32, 51, 0.14);
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.diagnostic-check input[type="checkbox"] {
+  width: auto !important;
+  margin: 0 !important;
+}
+
+.diagnostic-images-current {
+  margin: 6px 0 0;
+}
+
+@media (max-width: 700px) {
+  .diagnostic-checks {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .diagnostic-check {
+    width: 100%;
+  }
+}
+
+/* =========================================================
+   ANGIO-PARTICIPANTES-MATERIALES-FORCE-V3
+   Participantes y materiales nuevos
+   ========================================================= */
+
+.structured-list {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0 14px;
+}
+
+.structured-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(255, 250, 240, 0.92);
+  border: 1px solid rgba(16, 32, 51, 0.10);
+}
+
+.five {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(120px, 1fr));
+  gap: 14px;
+}
+
+@media (max-width: 1100px) {
+  .five {
+    grid-template-columns: repeat(2, minmax(160px, 1fr));
+  }
+}
+
+@media (max-width: 700px) {
+  .structured-item {
+    grid-template-columns: 1fr;
+  }
+
+  .structured-item form button {
+    width: 100% !important;
+  }
+
+  .five {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* =========================================================
+   ANGIO-MATERIALES-DEDICADOS-V4
+   Materiales dedicados del procedimiento
+   ========================================================= */
+
+.structured-list {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0 14px;
+}
+
+.structured-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(255, 250, 240, 0.92);
+  border: 1px solid rgba(16, 32, 51, 0.10);
+}
+
+.five {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(120px, 1fr));
+  gap: 14px;
+}
+
+@media (max-width: 1100px) {
+  .five {
+    grid-template-columns: repeat(2, minmax(160px, 1fr));
+  }
+}
+
+@media (max-width: 700px) {
+  .structured-item {
+    grid-template-columns: 1fr;
+  }
+
+  .structured-item form button {
+    width: 100% !important;
+  }
+
+  .five {
+    grid-template-columns: 1fr;
+  }
+}

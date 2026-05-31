@@ -62,9 +62,9 @@
                         <select name="estado_caso">
                             <option value="" {% if not estado_caso %}selected{% endif %}>Todos</option>
                             <option value="abierto" {% if estado_caso == "abierto" %}selected{% endif %}>Abierto</option>
-                            <option value="hospitalizado" {% if estado_caso == "hospitalizado" %}selected{% endif %}>Hospitalizado</option>
-                            <option value="pendiente_control" {% if estado_caso == "pendiente_control" %}selected{% endif %}>Pendiente control</option>
-                            <option value="de_alta" {% if estado_caso == "de_alta" %}selected{% endif %}>De alta</option>
+                            <option value="hospitalizado" {% if estado_caso == "hospitalizado" %}selected{% endif %}>Está hospitalizado</option>
+                            <option value="pendiente_control_ambulatorio" {% if estado_caso == "pendiente_control_ambulatorio" %}selected{% endif %}>Pendiente control ambulatorio</option>
+                            <option value="cerrado" {% if estado_caso == "cerrado" %}selected{% endif %}>Cerrado</option>
                         </select>
                     </div>
 
