@@ -16,7 +16,7 @@ from routers.webhook import router as webhook_router
 from routers.pacientes import router as pacientes_router
 from database import engine, get_db
 from db.migrations import aplicar_migraciones_seguras
-from models import Base, Procedimiento, ParticipanteProcedimiento, Usuario
+from models import Base, Procedimiento, ParticipanteProcedimiento, Usuario, AuditoriaEvento
 
 from routers.usuarios import router as usuarios_router
 from routers.orthanc_gateway import router as orthanc_gateway_router
@@ -55,6 +55,30 @@ app.include_router(webhook_router)
 app.include_router(pacientes_router)
 app.include_router(usuarios_router)
 app.include_router(orthanc_gateway_router)
+
+
+def registrar_evento_seguridad(
+    db: Session,
+    request: Request,
+    accion: str,
+    usuario: str | None = None,
+    tarea: str | None = None,
+    estado: str | None = None,
+    detalle: str | None = None,
+):
+    try:
+        evento = AuditoriaEvento(
+            usuario=usuario or request.session.get("user"),
+            ip=request.client.host if request.client else None,
+            user_agent=request.headers.get("user-agent"),
+            accion=accion,
+            tarea=tarea,
+            estado=estado,
+            detalle=detalle,
+        )
+        db.add(evento)
+    except Exception:
+        pass
 
 
 def require_login(request: Request):
@@ -311,6 +335,17 @@ def login_post(
         ultimo_login_previo = usuario.ultimo_login_en
         usuario.ultimo_login_en = datetime.utcnow()
         usuario.ultimo_login_ip = request.client.host if request.client else None
+
+        registrar_evento_seguridad(
+            db=db,
+            request=request,
+            accion="LOGIN_OK",
+            usuario=usuario.username,
+            tarea="login",
+            estado="ok",
+            detalle="Login exitoso.",
+        )
+
         db.commit()
         db.refresh(usuario)
 
@@ -330,6 +365,17 @@ def login_post(
 
     aplicar_delay_login()
 
+    registrar_evento_seguridad(
+        db=db,
+        request=request,
+        accion="LOGIN_FAILED",
+        usuario=username,
+        tarea="login",
+        estado="error",
+        detalle="Usuario o contraseña incorrectos.",
+    )
+    db.commit()
+
     return templates.TemplateResponse(
         request=request,
         name="login.html",
@@ -338,7 +384,22 @@ def login_post(
 
 
 @app.get("/logout")
-def logout(request: Request):
+def logout(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    usuario = request.session.get("user")
+    registrar_evento_seguridad(
+        db=db,
+        request=request,
+        accion="LOGOUT",
+        usuario=usuario,
+        tarea="logout",
+        estado="ok",
+        detalle="Cierre de sesión.",
+    )
+    db.commit()
+
     request.session.clear()
     return RedirectResponse(url="/login")
 

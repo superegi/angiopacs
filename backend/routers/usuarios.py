@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from passlib.context import CryptContext
 
 from database import get_db
-from models import Usuario
+from models import Usuario, AuditoriaEvento
 
 router = APIRouter()
 
@@ -17,6 +17,29 @@ pwd_context = CryptContext(
     schemes=["pbkdf2_sha256"],
     deprecated="auto"
 )
+
+
+def registrar_evento_usuario(
+    db: Session,
+    request: Request,
+    accion: str,
+    tarea: str | None = None,
+    estado: str | None = None,
+    detalle: str | None = None,
+):
+    try:
+        evento = AuditoriaEvento(
+            usuario=request.session.get("user"),
+            ip=request.client.host if request.client else None,
+            user_agent=request.headers.get("user-agent"),
+            accion=accion,
+            tarea=tarea,
+            estado=estado,
+            detalle=detalle,
+        )
+        db.add(evento)
+    except Exception:
+        pass
 
 
 def es_admin(request: Request) -> bool:
@@ -134,6 +157,17 @@ def nuevo_usuario(
     )
 
     db.add(nuevo)
+    db.flush()
+
+    registrar_evento_usuario(
+        db=db,
+        request=request,
+        accion="USER_CREATED",
+        tarea="usuarios",
+        estado="ok",
+        detalle=f"Usuario creado: id={nuevo.id}, username={nuevo.username}, rol={nuevo.rol}",
+    )
+
     db.commit()
 
     return RedirectResponse(
@@ -155,6 +189,16 @@ def toggle_usuario(
 
     if usuario:
         usuario.activo = "no" if bool_usuario(usuario.activo) else "si"
+
+        registrar_evento_usuario(
+            db=db,
+            request=request,
+            accion="USER_TOGGLE_ACTIVE",
+            tarea="usuarios",
+            estado="ok",
+            detalle=f"Usuario id={usuario.id}, username={usuario.username}, activo={usuario.activo}",
+        )
+
         db.commit()
 
     return RedirectResponse(url="/usuarios", status_code=303)
@@ -180,6 +224,16 @@ def reset_password_usuario(
         usuario.password_hash = pwd_context.hash(password_temporal)
         usuario.debe_cambiar_password = True
         usuario.password_temporal = True
+
+        registrar_evento_usuario(
+            db=db,
+            request=request,
+            accion="USER_PASSWORD_RESET",
+            tarea="usuarios",
+            estado="ok",
+            detalle=f"Reset de clave temporal para usuario id={usuario.id}, username={usuario.username}",
+        )
+
         db.commit()
 
     return RedirectResponse(url="/usuarios", status_code=303)
@@ -299,6 +353,24 @@ def mi_perfil_post(
         usuario.debe_cambiar_password = False
         usuario.password_temporal = False
         request.session["must_change_password"] = False
+
+        registrar_evento_usuario(
+            db=db,
+            request=request,
+            accion="USER_PASSWORD_CHANGED",
+            tarea="mi_perfil",
+            estado="ok",
+            detalle=f"Usuario id={usuario.id}, username={usuario.username} cambió su contraseña.",
+        )
+
+    registrar_evento_usuario(
+        db=db,
+        request=request,
+        accion="USER_PROFILE_UPDATED",
+        tarea="mi_perfil",
+        estado="ok",
+        detalle=f"Usuario id={usuario.id}, username={usuario.username} actualizó su perfil.",
+    )
 
     db.commit()
 
