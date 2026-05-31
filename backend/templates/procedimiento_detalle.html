@@ -432,8 +432,9 @@
     <h2 class="card-title">Subir archivo a este caso</h2>
 
     <form method="post" action="/procedimientos/{{ procedimiento.id }}/archivos/subir" enctype="multipart/form-data">
-        <label>Archivo</label>
-        <input type="file" name="archivo" required>
+        <label>Archivos</label>
+        <input type="file" name="archivos" multiple required>
+        <div class="small">Puedes seleccionar múltiples archivos, incluyendo ZIP, DICOM, imágenes, videos o PDF.</div>
 
         <label>Categoría</label>
         <input name="categoria" list="categorias_archivo" placeholder="Ej: estudio_previo">
