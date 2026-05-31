@@ -1,310 +1,310 @@
 #!/usr/bin/env bash
-set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-cd "$ROOT_DIR"
+# NeuroPACS / AngioPACS env wizard
+# ASCII-safe. Do not add secrets to Git.
 
-ENV_EXAMPLE=".env.example"
-ENV_FILE=".env"
-CREDENTIALS_FILE=".env.credentials.txt"
+set -Eeuo pipefail
 
-RED="$(printf '\033[31m')"
-GREEN="$(printf '\033[32m')"
-YELLOW="$(printf '\033[33m')"
-BOLD="$(printf '\033[1m')"
-RESET="$(printf '\033[0m')"
+APP_NAME="NeuroPACS / AngioPACS"
 
-rand_hex() {
-  openssl rand -hex "${1:-24}"
+print_header() {
+  echo
+  echo "============================================================"
+  echo "$1"
+  echo "============================================================"
 }
 
-usage() {
-  cat <<EOF
-Uso:
-  scripts/generate_env.sh [opciones]
-
-Comportamiento estándar:
-  - Si NO existe .env: abre wizard interactivo.
-  - Si existe .env: advierte en rojo y pregunta si quieres sobrescribir.
-  - Genera claves seguras y las muestra/guarda para el primer ingreso.
-
-Opciones:
-  --force        Sobrescribe .env sin preguntar.
-  --keep         Si .env existe, no lo modifica.
-  -h, --help     Muestra ayuda.
-EOF
+is_port_busy() {
+  local port="$1"
+  ss -ltn 2>/dev/null | awk '{print $4}' | grep -Eq "(:|\\])${port}$"
 }
 
-FORCE=0
-KEEP=0
+suggest_free_port() {
+  local start="$1"
+  local port="$start"
 
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    --force)
-      FORCE=1
-      shift
-      ;;
-    --keep)
-      KEEP=1
-      shift
-      ;;
-    -h|--help)
-      usage
-      exit 0
-      ;;
-    *)
-      echo "ERROR: opción no reconocida: $1" >&2
-      usage
-      exit 1
-      ;;
-  esac
-done
+  while is_port_busy "$port"; do
+    port=$((port + 1))
+  done
 
-if [[ ! -f "$ENV_EXAMPLE" ]]; then
-  echo "ERROR: no existe $ENV_EXAMPLE" >&2
-  exit 1
-fi
+  echo "$port"
+}
 
-if [[ -f "$ENV_FILE" && "$KEEP" -eq 1 ]]; then
-  echo "OK: $ENV_FILE existe. No se modifica."
-  exit 0
-fi
+ask_default() {
+  local prompt="$1"
+  local default="$2"
+  local value=""
 
-if [[ -f "$ENV_FILE" && "$FORCE" -ne 1 ]]; then
-  echo
-  echo "${RED}${BOLD}ADVERTENCIA: ya existe .env.${RESET}"
-  echo "${YELLOW}Sobrescribirlo generará nuevas claves y puede desconectar la base de datos/Orthanc actuales.${RESET}"
-  echo
-  read -rp "¿Quieres sobrescribir .env? Escribe SI para continuar: " CONFIRMAR
-
-  if [[ "$CONFIRMAR" != "SI" ]]; then
-    echo "OK: se conserva .env actual."
-    exit 0
+  read -r -p "${prompt} [${default}]: " value
+  if [ -z "$value" ]; then
+    value="$default"
   fi
-fi
 
-if [[ -f "$ENV_FILE" ]]; then
-  BACKUP=".env.backup_$(date +%F_%H%M%S)"
-  cp "$ENV_FILE" "$BACKUP"
-  chmod 600 "$BACKUP"
-  echo "Backup creado: $BACKUP"
-fi
+  echo "$value"
+}
 
-umask 077
-cp "$ENV_EXAMPLE" "$ENV_FILE"
-chmod 600 "$ENV_FILE"
+ask_port() {
+  local name="$1"
+  local default="$2"
+  local suggested="$default"
+  local value=""
 
-set_kv() {
-  local key="$1"
-  local val="$2"
+  if is_port_busy "$default"; then
+    suggested="$(suggest_free_port "$default")"
+    echo "AVISO: el puerto ${default} para ${name} esta ocupado." >&2
+    echo "Sugerencia: ${suggested}" >&2
+  fi
 
-  python3 - "$ENV_FILE" "$key" "$val" <<'PY'
-from pathlib import Path
+  while true; do
+    value="$(ask_default "${name}" "${suggested}")"
+
+    if ! [[ "$value" =~ ^[0-9]+$ ]]; then
+      echo "ERROR: el puerto debe ser numerico." >&2
+      continue
+    fi
+
+    if is_port_busy "$value"; then
+      echo "AVISO: el puerto ${value} esta ocupado." >&2
+      read -r -p "Usarlo de todas formas? [s/N]: " force
+      case "$force" in
+        s|S|si|SI|Si)
+          echo "$value"
+          return
+          ;;
+        *)
+          suggested="$(suggest_free_port "$((value + 1))")"
+          echo "Nueva sugerencia: ${suggested}" >&2
+          ;;
+      esac
+    else
+      echo "$value"
+      return
+    fi
+  done
+}
+
+gen_hex() {
+  local bytes="${1:-24}"
+  python3 - "$bytes" <<'PY'
+import secrets
 import sys
-
-path = Path(sys.argv[1])
-key = sys.argv[2]
-val = sys.argv[3]
-
-lines = path.read_text().splitlines()
-out = []
-found = False
-
-for line in lines:
-    if line.startswith(f"{key}="):
-        out.append(f"{key}={val}")
-        found = True
-    else:
-        out.append(line)
-
-if not found:
-    out.append(f"{key}={val}")
-
-path.write_text("\n".join(out) + "\n")
+n = int(sys.argv[1])
+print(secrets.token_hex(n))
 PY
 }
 
-prompt_default() {
-  local label="$1"
-  local current="$2"
-  local value=""
-
-  read -rp "${label} [${current}]: " value
-  if [[ -n "$value" ]]; then
-    echo "$value"
-  else
-    echo "$current"
-  fi
+urlencode() {
+  python3 - "$1" <<'PY'
+from urllib.parse import quote
+import sys
+print(quote(sys.argv[1], safe=""))
+PY
 }
 
-prompt_secret_generated() {
-  local label="$1"
-  local generated="$2"
-  local value=""
+write_env() {
+  local env_file="$1"
 
-  read -rsp "${label} [Enter = usar clave generada]: " value
-  echo >&2
+  cat > "$env_file" <<EOF
+# ${APP_NAME}
+# Generated by scripts/generate_env.sh
+# Do not commit this file.
 
-  if [[ -n "$value" ]]; then
-    echo "$value"
-  else
-    echo "$generated"
-  fi
+TZ=${TZ_VALUE}
+
+# Web
+PORT_BACKEND=${PORT_BACKEND}
+WEB_PUBLIC_URL=${WEB_PUBLIC_URL}
+ANGIOPACS_PUBLIC_URL=${ANGIOPACS_PUBLIC_URL}
+
+# Initial admin user
+ANGIOPACS_BOOTSTRAP_ADMIN=true
+ANGIOPACS_USER=${ANGIOPACS_USER}
+ANGIOPACS_PASSWORD=${ANGIOPACS_PASSWORD}
+ANGIOPACS_SESSION_SECRET=${ANGIOPACS_SESSION_SECRET}
+
+# PostgreSQL
+POSTGRES_USER=${POSTGRES_USER}
+POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+POSTGRES_DB=${POSTGRES_DB}
+DATABASE_URL=${DATABASE_URL}
+
+# Orthanc
+ORTHANC_NAME=${ORTHANC_NAME}
+ORTHANC_AETITLE=${ORTHANC_AETITLE}
+ORTHANC_BIND_ADDRESS=${ORTHANC_BIND_ADDRESS}
+ORTHANC_AUTHENTICATION_ENABLED=${ORTHANC_AUTHENTICATION_ENABLED}
+
+PORT_ORTHANC_WEB=${PORT_ORTHANC_WEB}
+PORT_ORTHANC_DICOM=${PORT_ORTHANC_DICOM}
+
+ORTHANC_URL=${ORTHANC_URL}
+ORTHANC_PUBLIC_URL=${ORTHANC_PUBLIC_URL}
+
+ORTHANC_BACKEND_USER=${ORTHANC_BACKEND_USER}
+ORTHANC_BACKEND_PASSWORD=${ORTHANC_BACKEND_PASSWORD}
+
+ORTHANC_USER=${ORTHANC_BACKEND_USER}
+ORTHANC_PASSWORD=${ORTHANC_BACKEND_PASSWORD}
+
+ORTHANC_ADMIN_USER=${ORTHANC_ADMIN_USER}
+ORTHANC_ADMIN_PASSWORD=${ORTHANC_ADMIN_PASSWORD}
+
+ORTHANC_VISIT_USER=${ORTHANC_VISIT_USER}
+ORTHANC_VISIT_PASSWORD=${ORTHANC_VISIT_PASSWORD}
+
+# Telegram
+TELEGRAM_TOKEN=${TELEGRAM_TOKEN}
+EOF
 }
 
+write_secrets_summary() {
+  local secrets_file="$1"
+
+  cat > "$secrets_file" <<EOF
+Credentials generated by scripts/generate_env.sh
+Do not commit this file.
+
+WEB AngioPACS:
+  URL:     ${WEB_PUBLIC_URL}
+  Usuario: ${ANGIOPACS_USER}
+  Clave:   ${ANGIOPACS_PASSWORD}
+
+Orthanc admin:
+  URL:     http://localhost:${PORT_ORTHANC_WEB}
+  Usuario: ${ORTHANC_ADMIN_USER}
+  Clave:   ${ORTHANC_ADMIN_PASSWORD}
+
+Orthanc backend:
+  Usuario: ${ORTHANC_BACKEND_USER}
+  Clave:   ${ORTHANC_BACKEND_PASSWORD}
+
+PostgreSQL:
+  Usuario: ${POSTGRES_USER}
+  Base:    ${POSTGRES_DB}
+  Clave:   ${POSTGRES_PASSWORD}
+
+Variables principales:
+PORT_BACKEND=${PORT_BACKEND}
+PORT_ORTHANC_WEB=${PORT_ORTHANC_WEB}
+PORT_ORTHANC_DICOM=${PORT_ORTHANC_DICOM}
+ORTHANC_PUBLIC_URL=${ORTHANC_PUBLIC_URL}
+ORTHANC_AUTHENTICATION_ENABLED=${ORTHANC_AUTHENTICATION_ENABLED}
+ORTHANC_BIND_ADDRESS=${ORTHANC_BIND_ADDRESS}
+WEB_PUBLIC_URL=${WEB_PUBLIC_URL}
+ANGIOPACS_PUBLIC_URL=${ANGIOPACS_PUBLIC_URL}
+EOF
+}
+
+print_header "$APP_NAME env wizard"
+
+echo "This wizard creates a local .env file."
+echo "It checks if common ports are already busy."
+echo "It creates a backup if .env already exists."
 echo
-echo "${BOLD}Wizard de configuración AngioPACS / NeuroPACS${RESET}"
-echo "Presiona Enter para aceptar el valor sugerido."
+
+print_header "Port configuration"
+
+PORT_BACKEND="$(ask_port "PORT_BACKEND" "8000")"
+PORT_ORTHANC_WEB="$(ask_port "PORT_ORTHANC_WEB" "8042")"
+PORT_ORTHANC_DICOM="$(ask_port "PORT_ORTHANC_DICOM" "4242")"
+
+print_header "Public URLs"
+
+DEFAULT_WEB_URL="http://localhost:${PORT_BACKEND}"
+WEB_PUBLIC_URL="$(ask_default "WEB_PUBLIC_URL" "$DEFAULT_WEB_URL")"
+ANGIOPACS_PUBLIC_URL="$(ask_default "ANGIOPACS_PUBLIC_URL" "$WEB_PUBLIC_URL")"
+
 echo
+echo "ORTHANC_PUBLIC_URL should usually be /orthanc."
+echo "This avoids asking users for the Orthanc password in the browser."
+ORTHANC_PUBLIC_URL="$(ask_default "ORTHANC_PUBLIC_URL" "/orthanc")"
 
-# Defaults seguros/generales
-POSTGRES_USER="admin_angio"
-POSTGRES_DB="angiopacs_db"
+print_header "Orthanc internal configuration"
 
-ANGIOPACS_USER="admin"
-ANGIOPACS_PASSWORD_GENERATED="$(rand_hex 16)"
-ANGIOPACS_SESSION_SECRET="$(rand_hex 32)"
+ORTHANC_URL="$(ask_default "ORTHANC_URL" "http://orthanc-pacs:8042")"
+ORTHANC_NAME="$(ask_default "ORTHANC_NAME" "NeuroPACS")"
+ORTHANC_AETITLE="$(ask_default "ORTHANC_AETITLE" "ORTHANC")"
+ORTHANC_BIND_ADDRESS="$(ask_default "ORTHANC_BIND_ADDRESS" "127.0.0.1")"
+ORTHANC_AUTHENTICATION_ENABLED="$(ask_default "ORTHANC_AUTHENTICATION_ENABLED" "true")"
 
-POSTGRES_PASSWORD="$(rand_hex 24)"
+print_header "Database configuration"
+
+POSTGRES_USER="$(ask_default "POSTGRES_USER" "admin_angio")"
+POSTGRES_DB="$(ask_default "POSTGRES_DB" "angiopacs_db")"
+
+print_header "Application user"
+
+ANGIOPACS_USER="$(ask_default "ANGIOPACS_USER" "admin")"
+
+print_header "Telegram"
+
+TELEGRAM_TOKEN="$(ask_default "TELEGRAM_TOKEN" "CAMBIAR_TELEGRAM_TOKEN")"
+
+print_header "Generate secrets"
+
+ANGIOPACS_PASSWORD="$(gen_hex 16)"
+ANGIOPACS_SESSION_SECRET="$(gen_hex 32)"
+
+POSTGRES_PASSWORD="$(gen_hex 24)"
 
 ORTHANC_BACKEND_USER="angio_backend"
-ORTHANC_BACKEND_PASSWORD="$(rand_hex 24)"
+ORTHANC_BACKEND_PASSWORD="$(gen_hex 24)"
 
 ORTHANC_ADMIN_USER="admin_orthanc"
-ORTHANC_ADMIN_PASSWORD_GENERATED="$(rand_hex 24)"
+ORTHANC_ADMIN_PASSWORD="$(gen_hex 24)"
 
 ORTHANC_VISIT_USER="visita"
-ORTHANC_VISIT_PASSWORD="$(rand_hex 24)"
+ORTHANC_VISIT_PASSWORD="$(gen_hex 24)"
 
-PORT_BACKEND_DEFAULT="8000"
-PORT_ORTHANC_WEB_DEFAULT="8042"
-PORT_ORTHANC_DICOM_DEFAULT="4242"
+TZ_VALUE="$(ask_default "TZ" "America/Santiago")"
 
-ANGIOPACS_USER="$(prompt_default "Usuario admin web inicial" "$ANGIOPACS_USER")"
-ANGIOPACS_PASSWORD="$(prompt_secret_generated "Clave admin web inicial" "$ANGIOPACS_PASSWORD_GENERATED")"
+ENC_POSTGRES_USER="$(urlencode "$POSTGRES_USER")"
+ENC_POSTGRES_PASSWORD="$(urlencode "$POSTGRES_PASSWORD")"
+ENC_POSTGRES_DB="$(urlencode "$POSTGRES_DB")"
 
-echo
-read -rp "Token Telegram [vacío si no lo usarás ahora]: " TELEGRAM_TOKEN
+DATABASE_URL="postgresql://${ENC_POSTGRES_USER}:${ENC_POSTGRES_PASSWORD}@postgres-db:5432/${ENC_POSTGRES_DB}"
 
-echo
-PORT_BACKEND="$(prompt_default "Puerto host web FastAPI" "$PORT_BACKEND_DEFAULT")"
-PORT_ORTHANC_WEB="$(prompt_default "Puerto host Orthanc Web" "$PORT_ORTHANC_WEB_DEFAULT")"
-PORT_ORTHANC_DICOM="$(prompt_default "Puerto host Orthanc DICOM" "$PORT_ORTHANC_DICOM_DEFAULT")"
+print_header "Consistency checks"
 
-echo
-echo "Bind Orthanc:"
-echo "  127.0.0.1 = más seguro, solo local en este servidor."
-echo "  0.0.0.0   = accesible desde red/VPN/Traefik. Úsalo si Traefik está en otro servidor."
-ORTHANC_BIND_ADDRESS="$(prompt_default "Bind Orthanc en host" "127.0.0.1")"
-
-echo
-WEB_PUBLIC_URL_DEFAULT="http://localhost:${PORT_BACKEND}"
-ORTHANC_PUBLIC_URL_DEFAULT="http://localhost:${PORT_ORTHANC_WEB}"
-
-WEB_PUBLIC_URL="$(prompt_default "URL pública web AngioPACS" "$WEB_PUBLIC_URL_DEFAULT")"
-ANGIOPACS_PUBLIC_URL="$WEB_PUBLIC_URL"
-ORTHANC_PUBLIC_URL="$(prompt_default "URL pública Orthanc" "$ORTHANC_PUBLIC_URL_DEFAULT")"
-
-echo
-ORTHANC_ADMIN_USER="$(prompt_default "Usuario admin Orthanc" "$ORTHANC_ADMIN_USER")"
-ORTHANC_ADMIN_PASSWORD="$(prompt_secret_generated "Clave admin Orthanc" "$ORTHANC_ADMIN_PASSWORD_GENERATED")"
-
-# Escritura de variables
-set_kv TZ "America/Santiago"
-
-set_kv POSTGRES_USER "$POSTGRES_USER"
-set_kv POSTGRES_PASSWORD "$POSTGRES_PASSWORD"
-set_kv POSTGRES_DB "$POSTGRES_DB"
-
-set_kv PORT_BACKEND "$PORT_BACKEND"
-
-set_kv ANGIOPACS_USER "$ANGIOPACS_USER"
-set_kv ANGIOPACS_PASSWORD "$ANGIOPACS_PASSWORD"
-set_kv ANGIOPACS_SESSION_SECRET "$ANGIOPACS_SESSION_SECRET"
-set_kv ANGIOPACS_BOOTSTRAP_ADMIN "true"
-
-set_kv TELEGRAM_TOKEN "$TELEGRAM_TOKEN"
-
-set_kv PORT_ORTHANC_WEB "$PORT_ORTHANC_WEB"
-set_kv PORT_ORTHANC_DICOM "$PORT_ORTHANC_DICOM"
-set_kv ORTHANC_BIND_ADDRESS "$ORTHANC_BIND_ADDRESS"
-
-set_kv ORTHANC_NAME "NeuroPACS"
-set_kv ORTHANC_AETITLE "ORTHANC"
-set_kv ORTHANC_URL "http://orthanc-pacs:8042"
-set_kv ORTHANC_PUBLIC_URL "$ORTHANC_PUBLIC_URL"
-set_kv ORTHANC_AUTHENTICATION_ENABLED "true"
-
-set_kv ORTHANC_BACKEND_USER "$ORTHANC_BACKEND_USER"
-set_kv ORTHANC_BACKEND_PASSWORD "$ORTHANC_BACKEND_PASSWORD"
-
-set_kv ORTHANC_ADMIN_USER "$ORTHANC_ADMIN_USER"
-set_kv ORTHANC_ADMIN_PASSWORD "$ORTHANC_ADMIN_PASSWORD"
-
-set_kv ORTHANC_VISIT_USER "$ORTHANC_VISIT_USER"
-set_kv ORTHANC_VISIT_PASSWORD "$ORTHANC_VISIT_PASSWORD"
-
-# Compatibilidad con código actual
-set_kv ORTHANC_USER "$ORTHANC_BACKEND_USER"
-set_kv ORTHANC_PASSWORD "$ORTHANC_BACKEND_PASSWORD"
-
-set_kv WEB_PUBLIC_URL "$WEB_PUBLIC_URL"
-set_kv ANGIOPACS_PUBLIC_URL "$ANGIOPACS_PUBLIC_URL"
-set_kv DATABASE_URL "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres-db:5432/${POSTGRES_DB}"
-
-cat > "$CREDENTIALS_FILE" <<EOF
-Credenciales generadas para AngioPACS / NeuroPACS
-
-WEB:
-URL: ${WEB_PUBLIC_URL}
-Usuario: ${ANGIOPACS_USER}
-Clave: ${ANGIOPACS_PASSWORD}
-
-ORTHANC ADMIN:
-URL: ${ORTHANC_PUBLIC_URL}
-Usuario: ${ORTHANC_ADMIN_USER}
-Clave: ${ORTHANC_ADMIN_PASSWORD}
-
-ORTHANC BACKEND:
-Usuario: ${ORTHANC_BACKEND_USER}
-Clave: ${ORTHANC_BACKEND_PASSWORD}
-
-ORTHANC VISITA:
-Usuario: ${ORTHANC_VISIT_USER}
-Clave: ${ORTHANC_VISIT_PASSWORD}
-EOF
-
-chmod 600 "$CREDENTIALS_FILE"
-
-BAD_PLACEHOLDERS="$(grep -nE '^[A-Z0-9_]+=.*(GENERAR|CAMBIAR|1234qwer|super_secreto|super_secret|CAMBIAR_POSTGRES_PASSWORD)' "$ENV_FILE" || true)"
-
-if [[ -n "$BAD_PLACEHOLDERS" ]]; then
-  echo "ERROR: quedaron placeholders inseguros en $ENV_FILE:" >&2
-  echo "$BAD_PLACEHOLDERS" >&2
-  exit 1
+if [ "$ORTHANC_PUBLIC_URL" != "/orthanc" ]; then
+  echo "AVISO: ORTHANC_PUBLIC_URL no es /orthanc."
+  echo "Valor actual: ${ORTHANC_PUBLIC_URL}"
+  echo "Esto puede hacer que el navegador vaya directo a Orthanc y pida clave."
 fi
 
-if grep -q '\$' "$ENV_FILE"; then
-  echo "ERROR: hay signos \$ en $ENV_FILE. Docker Compose podría interpretarlos mal." >&2
-  grep -n '\$' "$ENV_FILE" >&2
-  exit 1
+if [ "$ORTHANC_AUTHENTICATION_ENABLED" != "true" ]; then
+  echo "AVISO: ORTHANC_AUTHENTICATION_ENABLED no es true."
+  echo "En produccion se recomienda true."
 fi
 
+if [ "$ORTHANC_BIND_ADDRESS" != "127.0.0.1" ]; then
+  echo "AVISO: ORTHANC_BIND_ADDRESS no es 127.0.0.1."
+  echo "Revise si Orthanc quedara expuesto fuera del host."
+fi
+
+print_header "Write files"
+
+if [ -f .env ]; then
+  TS="$(date +%Y%m%d_%H%M%S)"
+  cp .env ".env.bak.${TS}"
+  echo "Backup created: .env.bak.${TS}"
+fi
+
+write_env ".env"
+write_secrets_summary ".env.generated.secrets.txt"
+
+chmod 600 .env .env.generated.secrets.txt
+
+echo "OK: .env generated"
+echo "OK: .env.generated.secrets.txt generated"
 echo
-echo "${GREEN}${BOLD}OK: $ENV_FILE generado.${RESET}"
-echo "${GREEN}OK: credenciales guardadas en $CREDENTIALS_FILE${RESET}"
+
+print_header "Summary"
+
+cat .env.generated.secrets.txt
+
 echo
-echo "${BOLD}Credenciales iniciales para primer ingreso:${RESET}"
-echo
-echo "WEB AngioPACS:"
-echo "  URL:     ${WEB_PUBLIC_URL}"
-echo "  Usuario: ${ANGIOPACS_USER}"
-echo "  Clave:   ${ANGIOPACS_PASSWORD}"
-echo
-echo "Orthanc admin:"
-echo "  URL:     ${ORTHANC_PUBLIC_URL}"
-echo "  Usuario: ${ORTHANC_ADMIN_USER}"
-echo "  Clave:   ${ORTHANC_ADMIN_PASSWORD}"
-echo
-echo "Variables principales:"
-grep -E '^(PORT_BACKEND|PORT_ORTHANC_WEB|PORT_ORTHANC_DICOM|ORTHANC_BIND_ADDRESS|WEB_PUBLIC_URL|ANGIOPACS_PUBLIC_URL|ORTHANC_PUBLIC_URL|ORTHANC_AUTHENTICATION_ENABLED)=' "$ENV_FILE"
+echo "Next steps:"
+echo "  docker compose up -d --build"
+echo "  docker compose ps"
+echo "  Open: ${WEB_PUBLIC_URL}/login"

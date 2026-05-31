@@ -18,6 +18,7 @@ from db.migrations import aplicar_migraciones_seguras
 from models import Base, Procedimiento, ParticipanteProcedimiento, Usuario
 
 from routers.usuarios import router as usuarios_router
+from routers.orthanc_gateway import router as orthanc_gateway_router
 
 Base.metadata.create_all(bind=engine)
 aplicar_migraciones_seguras(engine)
@@ -52,6 +53,7 @@ templates = Jinja2Templates(directory=BASE_DIR / "templates")
 app.include_router(webhook_router)
 app.include_router(pacientes_router)
 app.include_router(usuarios_router)
+app.include_router(orthanc_gateway_router)
 
 
 def require_login(request: Request):

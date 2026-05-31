@@ -49,3 +49,6 @@ config/orthanc.json
 .env.*
 !.env.example
 *.credentials.txt
+.env.generated.secrets.txt
+.env.bak*
+*.bak.*
