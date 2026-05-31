@@ -24,6 +24,24 @@ def aplicar_migraciones_seguras(engine):
     ALTER TABLE archivos
     ALTER COLUMN estado TYPE TEXT;
 
+    ALTER TABLE usuarios
+    ADD COLUMN IF NOT EXISTS debe_cambiar_password BOOLEAN DEFAULT TRUE;
+
+    ALTER TABLE usuarios
+    ADD COLUMN IF NOT EXISTS password_temporal BOOLEAN DEFAULT TRUE;
+
+    ALTER TABLE usuarios
+    ADD COLUMN IF NOT EXISTS ultimo_login_en TIMESTAMP WITHOUT TIME ZONE;
+
+    ALTER TABLE usuarios
+    ADD COLUMN IF NOT EXISTS ultimo_login_ip VARCHAR(100);
+
+    ALTER TABLE usuarios
+    ADD COLUMN IF NOT EXISTS perfil_actualizado_en TIMESTAMP WITHOUT TIME ZONE;
+
+    CREATE INDEX IF NOT EXISTS ix_usuarios_ultimo_login_en
+    ON usuarios (ultimo_login_en);
+
     CREATE TABLE IF NOT EXISTS auditoria_eventos (
         id SERIAL PRIMARY KEY,
         creado_en TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW(),

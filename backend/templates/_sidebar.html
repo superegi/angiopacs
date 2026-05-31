@@ -33,5 +33,22 @@
     <a class="side-link" href="#">Estadísticas</a>
 
     <div class="side-section">Usuario</div>
+    <div class="side-user-box">
+        <strong>{{ request.session.get("user", "Usuario") }}</strong>
+        {% if request.session.get("bootstrap_admin") %}
+        <span>Admin inicial</span>
+        {% elif request.session.get("ultimo_login_previo") %}
+        <span>Última previa: {{ request.session.get("ultimo_login_previo") }}</span>
+        {% else %}
+        <span>Primera conexión registrada</span>
+        {% endif %}
+        {% if request.session.get("must_change_password") %}
+        <span class="side-warning">Clave temporal</span>
+        {% endif %}
+    </div>
+
+    {% if not request.session.get("bootstrap_admin") %}
+    <a class="side-link {% if path.startswith('/mi-perfil') %}active{% endif %}" href="/mi-perfil">Mi perfil</a>
+    {% endif %}
     <a class="side-link" href="/logout">Cerrar sesión</a>
 </aside>

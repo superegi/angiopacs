@@ -23,8 +23,13 @@
 
 <main class="container">
 
+{% if error %}
+<div class="login-error">{{ error }}</div>
+{% endif %}
+
 <div class="card">
     <h2 class="card-title">Nuevo usuario</h2>
+    <p class="muted">La contraseña creada aquí es temporal. En el primer login el usuario deberá cambiarla.</p>
 
     <form method="post" action="/usuarios/nuevo">
 
@@ -35,8 +40,8 @@
             </div>
 
             <div>
-                <label>Password</label>
-                <input name="password" type="password" required>
+                <label>Contraseña temporal</label>
+                <input name="password" type="password" required autocomplete="new-password">
             </div>
         </div>
 
@@ -48,7 +53,7 @@
 
             <div>
                 <label>Mail</label>
-                <input name="mail">
+                <input name="mail" type="email">
             </div>
         </div>
 
@@ -77,6 +82,7 @@
                     <option>Radiologo</option>
                     <option>Neurologo</option>
                     <option>Neurocirujano</option>
+                    <option>Otro</option>
                 </select>
             </div>
         </div>
@@ -102,10 +108,14 @@
 <th>ID</th>
 <th>Username</th>
 <th>Nombre</th>
+<th>Mail</th>
 <th>Especialidad</th>
 <th>Rol</th>
 <th>Activo</th>
-<th>Acción</th>
+<th>Clave temporal</th>
+<th>Debe cambiar</th>
+<th>Última conexión</th>
+<th>Acciones</th>
 </tr>
 </thead>
 
@@ -114,11 +124,21 @@
 <tr>
 <td>{{ u.id }}</td>
 <td>{{ u.username }}</td>
-<td>{{ u.nombre }}</td>
-<td>{{ u.especialidad }}</td>
+<td>{{ u.nombre or "" }}</td>
+<td>{{ u.mail or "" }}</td>
+<td>{{ u.especialidad or "" }}</td>
 <td>{{ u.rol }}</td>
 <td>{{ u.activo }}</td>
+<td>{% if u.password_temporal %}Sí{% else %}No{% endif %}</td>
+<td>{% if u.debe_cambiar_password %}Sí{% else %}No{% endif %}</td>
 <td>
+    {% if u.ultimo_login_en %}
+        {{ u.ultimo_login_en.strftime("%Y-%m-%d %H:%M") }}
+    {% else %}
+        --
+    {% endif %}
+</td>
+<td class="actions-cell">
     <form method="post" action="/usuarios/{{ u.id }}/toggle-activo">
         <button type="submit">
             {% if u.activo == "si" %}
@@ -127,6 +147,11 @@
                 Activar
             {% endif %}
         </button>
+    </form>
+
+    <form method="post" action="/usuarios/{{ u.id }}/reset-password" class="inline-reset-form">
+        <input name="password_temporal" type="password" placeholder="Nueva temporal" required autocomplete="new-password">
+        <button type="submit">Reset clave</button>
     </form>
 </td>
 </tr>
@@ -140,51 +165,6 @@
 </main>
 </section>
 </div>
-
-
-<!-- NeuroPACS: alerta de cambios no guardados -->
-<div id="save-status" class="save-status saved" style="display:none;">Guardado</div>
-
-<script>
-document.addEventListener("DOMContentLoaded", function () {
-    let dirty = false;
-    const status = document.getElementById("save-status");
-
-    function showStatus(text, cls) {
-        if (!status) return;
-        status.style.display = "block";
-        status.textContent = text;
-        status.className = "save-status " + cls;
-    }
-
-    function setDirty() {
-        dirty = true;
-        showStatus("Cambios sin guardar", "dirty");
-    }
-
-    const fields = document.querySelectorAll("input, textarea, select");
-    const forms = document.querySelectorAll("form");
-
-    fields.forEach(function (field) {
-        field.addEventListener("input", setDirty);
-        field.addEventListener("change", setDirty);
-    });
-
-    forms.forEach(function (form) {
-        form.addEventListener("submit", function () {
-            dirty = false;
-            showStatus("Guardando...", "saving");
-        });
-    });
-
-    window.addEventListener("beforeunload", function (event) {
-        if (!dirty) return;
-
-        event.preventDefault();
-        event.returnValue = "";
-    });
-});
-</script>
 
 </body>
 </html>

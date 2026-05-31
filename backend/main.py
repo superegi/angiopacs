@@ -1,6 +1,7 @@
 from pathlib import Path
 import os
 import time
+from datetime import datetime
 
 from fastapi import FastAPI, Request, Depends, Form
 from passlib.context import CryptContext
@@ -54,6 +55,37 @@ app.include_router(webhook_router)
 app.include_router(pacientes_router)
 app.include_router(usuarios_router)
 app.include_router(orthanc_gateway_router)
+
+@app.middleware("http")
+async def enforce_password_change(request: Request, call_next):
+    """
+    Bloquea navegación si un usuario real de BD tiene clave temporal.
+    Permite login, logout, perfil, estáticos y health.
+    No aplica al bootstrap admin de .env.
+    """
+    path = request.url.path
+
+    rutas_libres = (
+        "/login",
+        "/logout",
+        "/mi-perfil",
+        "/static",
+        "/health",
+        "/favicon.ico",
+    )
+
+    if any(path == r or path.startswith(r + "/") for r in rutas_libres):
+        return await call_next(request)
+
+    if (
+        request.session.get("auth") is True
+        and request.session.get("bootstrap_admin") is not True
+        and request.session.get("must_change_password") is True
+    ):
+        return RedirectResponse(url="/mi-perfil?forzar_password=1", status_code=303)
+
+    return await call_next(request)
+
 
 
 def require_login(request: Request):
@@ -264,6 +296,8 @@ def login_post(
         request.session["user"] = username
         request.session["rol"] = "admin"
         request.session["bootstrap_admin"] = True
+        request.session["must_change_password"] = False
+        request.session["ultimo_login_previo"] = ""
 
         return RedirectResponse(url="/", status_code=303)
 
@@ -285,13 +319,25 @@ def login_post(
     if usuario and usuario_activo(usuario.activo) and password_ok:
         aplicar_delay_login()
 
+        ultimo_login_previo = usuario.ultimo_login_en
+        usuario.ultimo_login_en = datetime.utcnow()
+        usuario.ultimo_login_ip = request.client.host if request.client else None
+        db.commit()
+        db.refresh(usuario)
+
         request.session["auth"] = True
         request.session["user"] = usuario.username
         request.session["user_id"] = usuario.id
         request.session["rol"] = usuario.rol or "comun"
         request.session["bootstrap_admin"] = False
+        request.session["must_change_password"] = bool(usuario.debe_cambiar_password)
+        request.session["ultimo_login_previo"] = (
+            ultimo_login_previo.strftime("%Y-%m-%d %H:%M")
+            if ultimo_login_previo else ""
+        )
 
-        return RedirectResponse(url="/", status_code=303)
+        destino = "/mi-perfil?forzar_password=1" if usuario.debe_cambiar_password else "/"
+        return RedirectResponse(url=destino, status_code=303)
 
     aplicar_delay_login()
 

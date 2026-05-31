@@ -1700,3 +1700,48 @@ button:hover {
     background: rgba(14, 165, 233, 0.85);
     transition: width 0.2s ease;
 }
+
+
+/* NeuroPACS - usuario / perfil */
+.side-user-box {
+    margin: 8px 12px 12px 12px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.10);
+    font-size: 0.85rem;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.side-user-box span {
+    opacity: 0.85;
+}
+
+.side-warning {
+    color: #ffe082;
+    font-weight: 700;
+}
+
+.inline-reset-form {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    margin-top: 6px;
+}
+
+.inline-reset-form input {
+    min-width: 140px;
+}
+
+.actions-cell {
+    min-width: 260px;
+}
+
+.warning-card {
+    border-left: 5px solid #f5a623;
+}
+
+.success-card {
+    border-left: 5px solid #31a354;
+}

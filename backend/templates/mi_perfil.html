@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Mi perfil</title>
+<link rel="stylesheet" href="/static/css/style.css">
+</head>
+
+<body>
+
+<div class="app-shell">
+
+{% include "_sidebar.html" %}
+
+<section class="main-panel">
+
+<header class="topbar">
+    <div class="brand">
+        <h1>Mi perfil</h1>
+        <span>Datos del usuario y contraseña</span>
+    </div>
+</header>
+
+<main class="container">
+
+{% if forzar_password or usuario.debe_cambiar_password %}
+<div class="card warning-card">
+    <h2 class="card-title">Cambio de contraseña obligatorio</h2>
+    <p>Tu contraseña actual es temporal. Debes definir una nueva contraseña para continuar usando el sistema.</p>
+</div>
+{% endif %}
+
+{% if ok %}
+<div class="card success-card">
+    Perfil actualizado correctamente.
+</div>
+{% endif %}
+
+{% if error %}
+<div class="login-error">{{ error }}</div>
+{% endif %}
+
+<div class="card">
+    <h2 class="card-title">Datos personales</h2>
+
+    <form method="post" action="/mi-perfil">
+
+        <div class="two">
+            <div>
+                <label>Username</label>
+                <input value="{{ usuario.username }}" disabled>
+            </div>
+
+            <div>
+                <label>Rol</label>
+                <input value="{{ usuario.rol or '' }}" disabled>
+            </div>
+        </div>
+
+        <div class="two">
+            <div>
+                <label>Nombre</label>
+                <input name="nombre" value="{{ usuario.nombre or '' }}">
+            </div>
+
+            <div>
+                <label>Mail</label>
+                <input name="mail" type="email" value="{{ usuario.mail or '' }}">
+            </div>
+        </div>
+
+        <div class="two">
+            <div>
+                <label>País</label>
+                <input name="pais" value="{{ usuario.pais or '' }}">
+            </div>
+
+            <div>
+                <label>Ciudad</label>
+                <input name="ciudad" value="{{ usuario.ciudad or '' }}">
+            </div>
+        </div>
+
+        <div class="two">
+            <div>
+                <label>Edad</label>
+                <input name="edad" value="{{ usuario.edad or '' }}">
+            </div>
+
+            <div>
+                <label>Especialidad</label>
+                <select name="especialidad">
+                    {% set esp = usuario.especialidad or "" %}
+                    <option value="" {% if esp == "" %}selected{% endif %}>--</option>
+                    <option {% if esp == "Radiologo" %}selected{% endif %}>Radiologo</option>
+                    <option {% if esp == "Neurologo" %}selected{% endif %}>Neurologo</option>
+                    <option {% if esp == "Neurocirujano" %}selected{% endif %}>Neurocirujano</option>
+                    <option {% if esp == "Otro" %}selected{% endif %}>Otro</option>
+                </select>
+            </div>
+        </div>
+
+        <hr>
+
+        <h2 class="card-title">Contraseña</h2>
+
+        {% if not usuario.debe_cambiar_password %}
+        <label>Contraseña actual</label>
+        <input name="password_actual" type="password" autocomplete="current-password">
+        {% endif %}
+
+        <div class="two">
+            <div>
+                <label>Nueva contraseña</label>
+                <input name="password_nueva" type="password" autocomplete="new-password">
+            </div>
+
+            <div>
+                <label>Confirmar nueva contraseña</label>
+                <input name="password_confirmar" type="password" autocomplete="new-password">
+            </div>
+        </div>
+
+        <button type="submit">Guardar perfil</button>
+
+    </form>
+</div>
+
+</main>
+</section>
+</div>
+
+</body>
+</html>

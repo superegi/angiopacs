@@ -251,6 +251,13 @@ class Usuario(Base):
 
     activo = Column(String(10), default="si")
 
+    # Seguridad de usuarios
+    debe_cambiar_password = Column(Boolean, default=True)
+    password_temporal = Column(Boolean, default=True)
+    ultimo_login_en = Column(DateTime, nullable=True)
+    ultimo_login_ip = Column(String(100), nullable=True)
+    perfil_actualizado_en = Column(DateTime, nullable=True)
+
     creado_en = Column(DateTime, default=datetime.utcnow)
 
 
