@@ -9,13 +9,16 @@ import os
 import zipfile
 import json
 import unicodedata
-from datetime import datetime
+from urllib.parse import unquote
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 from services.orthanc_service import subir_dicom_a_orthanc
+from services.audit_service import start_task, finish_task, log_upload_file, log_zip_summary, log_global, log_case, log_case, log_global
 
 
 
 from database import get_db
-from models import Procedimiento, Archivo, ParticipanteProcedimiento, MaterialProcedimiento, EstudioDICOM, SugerenciaIA, RepositorioTag
+from models import Procedimiento, Archivo, ParticipanteProcedimiento, MaterialProcedimiento, EstudioDICOM, SugerenciaIA, RepositorioTag, AuditoriaEvento
 
 ORTHANC_PUBLIC_URL = os.getenv("ORTHANC_PUBLIC_URL", "http://localhost:8042")
 
@@ -131,6 +134,250 @@ def registrar_estudio_dicom_desde_archivo(db: Session, archivo: Archivo, procedi
 
     return estudio
 
+
+
+
+@router.get("/auditoria-sistema")
+def auditoria_sistema(
+    request: Request,
+    caso_id: str = "",
+    usuario: str = "",
+    tarea: str = "",
+    estado: str = "",
+    accion: str = "",
+    db: Session = Depends(get_db)
+):
+    if request.session.get("rol") != "admin":
+        return RedirectResponse(url="/", status_code=303)
+
+    query = db.query(AuditoriaEvento)
+
+    if caso_id and caso_id.isdigit():
+        query = query.filter(AuditoriaEvento.caso_id == int(caso_id))
+
+    if usuario:
+        query = query.filter(AuditoriaEvento.usuario.ilike(f"%{usuario}%"))
+
+    if tarea:
+        query = query.filter(AuditoriaEvento.tarea.ilike(f"%{tarea}%"))
+
+    if estado:
+        query = query.filter(AuditoriaEvento.estado == estado)
+
+    if accion:
+        query = query.filter(AuditoriaEvento.accion == accion)
+
+    eventos = query.order_by(AuditoriaEvento.id.desc()).limit(300).all()
+
+    return templates.TemplateResponse(
+        request=request,
+        name="auditoria_sistema.html",
+        context={
+            "eventos": eventos,
+            "caso_id": caso_id,
+            "usuario": usuario,
+            "tarea": tarea,
+            "estado": estado,
+            "accion": accion,
+        }
+    )
+
+
+
+
+
+def _peso_humano_caso(size_bytes):
+    try:
+        n = int(size_bytes or 0)
+    except Exception:
+        n = 0
+
+    if n >= 1024 * 1024 * 1024:
+        return f"{n / (1024 * 1024 * 1024):.1f} GB"
+    if n >= 1024 * 1024:
+        return f"{n / (1024 * 1024):.1f} MB"
+    if n >= 1024:
+        return f"{n / 1024:.1f} KB"
+    return f"{n} bytes"
+
+
+def _fecha_dispositivo_evento(e):
+    tz_name = getattr(e, "client_timezone", None) or os.getenv("TZ", "UTC") or "UTC"
+    try:
+        tz_name = unquote(str(tz_name))
+    except Exception:
+        pass
+
+    try:
+        tz = ZoneInfo(tz_name)
+    except Exception:
+        tz_name = "UTC"
+        tz = timezone.utc
+
+    dt = e.creado_en
+
+    if not dt:
+        return f"sin fecha {tz_name}"
+
+    try:
+        if dt.tzinfo is None:
+            # La BD guarda naive UTC.
+            dt = dt.replace(tzinfo=timezone.utc)
+
+        dt_local = dt.astimezone(tz)
+        return dt_local.strftime("%Y-%m-%d %H:%M:%S") + f" {tz_name}"
+    except Exception:
+        return str(dt) + f" {tz_name}"
+
+
+def _prefijo_evento_humano(e):
+    fecha = _fecha_dispositivo_evento(e)
+    usuario = e.usuario or "usuario"
+    dispositivo = e.dispositivo or "dispositivo no identificado"
+
+    return f"{fecha} - {usuario} - {dispositivo}"
+
+
+def _es_dicom_nombre(nombre):
+    n = (nombre or "").lower()
+    return n.endswith(".dcm") or n.endswith(".dicom") or n.endswith(".ima")
+
+
+def _detalle_valor(detalle, clave):
+    detalle = detalle or ""
+    marcador = clave + "="
+
+    if marcador not in detalle:
+        return ""
+
+    try:
+        return detalle.split(marcador, 1)[1].split(";", 1)[0].strip()
+    except Exception:
+        return ""
+
+
+def _evento_humano_caso(e):
+    prefijo = _prefijo_evento_humano(e)
+
+    accion = e.accion or ""
+    detalle = e.detalle or ""
+
+    if accion == "CASE_IMPORTED":
+        return f"{prefijo}: importó/recreó la ficha del caso desde un ZIP."
+
+    if accion == "CASE_CREATED":
+        return f"{prefijo}: creó la ficha del caso."
+
+    if accion == "CASE_UPDATED":
+        return f"{prefijo}: actualizó la ficha del caso."
+
+    if accion == "ZIP_UPLOAD_SUMMARY":
+        nombre = e.archivo_nombre or _detalle_valor(detalle, "zip") or "ZIP"
+        peso = _peso_humano_caso(e.archivo_bytes)
+        cantidad = _detalle_valor(detalle, "archivos_internos") or "varios"
+        return f"{prefijo}: subió el ZIP {nombre} ({peso}), con {cantidad} archivo(s) en su interior."
+
+    if accion == "UPLOAD_FILE":
+        # No mostrar DICOM internos extraídos desde ZIP en el log visible del caso.
+        if "archivo_extraido_desde_zip=" in detalle:
+            return None
+
+        nombre = e.archivo_nombre or "archivo"
+
+        # Si es ZIP, preferir ZIP_UPLOAD_SUMMARY. Si no existe, se mostrará como fallback.
+        if nombre.lower().endswith(".zip"):
+            return f"{prefijo}: subió el ZIP {nombre} ({_peso_humano_caso(e.archivo_bytes)})."
+
+        # DICOM suelto: se agrupa en obtener_log_humano_caso.
+        if _es_dicom_nombre(nombre):
+            return None
+
+        return f"{prefijo}: subió el archivo {nombre} ({_peso_humano_caso(e.archivo_bytes)})."
+
+    if accion == "FILE_DELETED":
+        nombre = e.archivo_nombre or _detalle_valor(detalle, "archivo_eliminado") or "archivo"
+        return f"{prefijo}: eliminó el archivo {nombre}."
+
+    if accion == "PARTICIPANT_ADDED":
+        return f"{prefijo}: agregó un participante a la ficha del caso. {detalle}".strip()
+
+    if accion == "PARTICIPANT_DELETED":
+        return f"{prefijo}: eliminó un participante de la ficha del caso. {detalle}".strip()
+
+    if accion == "MATERIAL_ADDED":
+        return f"{prefijo}: agregó material a la ficha del caso. {detalle}".strip()
+
+    if accion == "MATERIAL_DELETED":
+        return f"{prefijo}: eliminó material de la ficha del caso. {detalle}".strip()
+
+    return None
+
+
+def _resumen_dicom_suelto_humano(eventos):
+    if not eventos:
+        return None
+
+    prefijo = _prefijo_evento_humano(eventos[-1])
+    total = sum(int(e.archivo_bytes or 0) for e in eventos)
+
+    return (
+        f"{prefijo}: subió {len(eventos)} archivo(s) DICOM sueltos "
+        f"({_peso_humano_caso(total)} en total)."
+    )
+
+
+def obtener_log_humano_caso(db: Session, procedimiento_id: int, limite: int = 800):
+    acciones_relevantes = [
+        "CASE_IMPORTED",
+        "CASE_CREATED",
+        "CASE_UPDATED",
+        "ZIP_UPLOAD_SUMMARY",
+        "UPLOAD_FILE",
+        "FILE_DELETED",
+        "PARTICIPANT_ADDED",
+        "PARTICIPANT_DELETED",
+        "MATERIAL_ADDED",
+        "MATERIAL_DELETED",
+    ]
+
+    eventos = (
+        db.query(AuditoriaEvento)
+        .filter(
+            AuditoriaEvento.caso_id == procedimiento_id,
+            AuditoriaEvento.accion.in_(acciones_relevantes),
+        )
+        .order_by(AuditoriaEvento.id.asc())
+        .limit(limite)
+        .all()
+    )
+
+    lineas = []
+    dicom_sueltos_por_tarea = {}
+
+    for e in eventos:
+        if (e.accion or "") == "UPLOAD_FILE":
+            nombre = e.archivo_nombre or ""
+            detalle = e.detalle or ""
+
+            # Nunca mostrar internos extraídos desde ZIP.
+            if "archivo_extraido_desde_zip=" in detalle:
+                continue
+
+            if _es_dicom_nombre(nombre):
+                key = e.tarea_id or f"dicom_suelto_{e.id}"
+                dicom_sueltos_por_tarea.setdefault(key, []).append(e)
+                continue
+
+        texto = _evento_humano_caso(e)
+        if texto:
+            lineas.append(texto)
+
+    for eventos_dicom in dicom_sueltos_por_tarea.values():
+        resumen = _resumen_dicom_suelto_humano(eventos_dicom)
+        if resumen:
+            lineas.append(resumen)
+
+    return lineas[-120:]
 
 @router.get("/auditoria")
 def ver_auditoria(
@@ -398,6 +645,7 @@ def nuevo_caso_get(
 
 @router.post("/nuevo-caso")
 def nuevo_caso_post(
+    request: Request,
     paciente_nombre: str = Form(None),
     paciente_apellido: str = Form(None),
     paciente_sexo: str = Form(None),
@@ -442,6 +690,15 @@ def nuevo_caso_post(
     if "asegurar_tag" in globals():
         asegurar_tag(db, "institucion", institucion)
         asegurar_tag(db, "procedimiento", procedimiento_txt)
+
+    log_case(
+        procedimiento.id,
+        "CASE_CREATED",
+        request=request,
+        db=db,
+        detalle="ficha_del_caso_creada"
+    )
+    db.commit()
 
     return RedirectResponse(
         url=f"/procedimientos/{procedimiento.id}",
@@ -565,6 +822,8 @@ def ver_procedimiento(
     sugerencias_instituciones = listar_nombres_tag(db, "institucion")
     sugerencias_procedimientos = listar_nombres_tag(db, "procedimiento")
 
+    log_caso_humano = obtener_log_humano_caso(db, procedimiento_id)
+
     return templates.TemplateResponse(
         request=request,
         name="procedimiento_detalle.html",
@@ -583,6 +842,7 @@ def ver_procedimiento(
             "sugerencias_instituciones": sugerencias_instituciones,
             "sugerencias_procedimientos": sugerencias_procedimientos,
             "orthanc_public_url": ORTHANC_PUBLIC_URL,
+            "log_caso_humano": log_caso_humano,
 
         }
     )
@@ -591,6 +851,7 @@ def ver_procedimiento(
 @router.post("/procedimientos/{procedimiento_id}/participantes/agregar")
 async def agregar_participante_procedimiento(
     procedimiento_id: int,
+    request: Request,
     nombre: str = Form(...),
     rol: str = Form(...),
     notas: str = Form(None),
@@ -623,6 +884,7 @@ async def agregar_participante_procedimiento(
 @router.post("/procedimientos/{procedimiento_id}/materiales/agregar")
 async def agregar_material_procedimiento(
     procedimiento_id: int,
+    request: Request,
     nombre: str = Form(...),
     tipo_material: str = Form(None),
     cantidad: str = Form("1"),
@@ -661,6 +923,7 @@ async def agregar_material_procedimiento(
 def eliminar_participante_procedimiento(
     procedimiento_id: int,
     participante_id: int,
+    request: Request,
     db: Session = Depends(get_db)
 ):
     participante = (
@@ -678,6 +941,15 @@ def eliminar_participante_procedimiento(
     db.delete(participante)
     db.commit()
 
+    log_case(
+        procedimiento_id,
+        "CASE_UPDATED",
+        request=request,
+        db=db,
+        detalle="ficha_del_caso_actualizada"
+    )
+    db.commit()
+
     return RedirectResponse(
         url=f"/procedimientos/{procedimiento_id}",
         status_code=303
@@ -688,6 +960,7 @@ def eliminar_participante_procedimiento(
 def eliminar_material_procedimiento(
     procedimiento_id: int,
     material_id: int,
+    request: Request,
     db: Session = Depends(get_db)
 ):
     material = (
@@ -714,6 +987,7 @@ def eliminar_material_procedimiento(
 @router.post("/procedimientos/{procedimiento_id}/editar")
 async def editar_procedimiento(
     procedimiento_id: int,
+    request: Request,
     lugar: str = Form(None),
     historia_clinica: str = Form(None),
     paciente_nombre: str = Form(None),
@@ -976,6 +1250,7 @@ def actualizar_metadata_archivo(
 @router.post("/archivos/{archivo_id}/eliminar")
 def eliminar_archivo_procedimiento(
     archivo_id: int,
+    request: Request,
     db: Session = Depends(get_db)
 ):
     archivo = db.query(Archivo).filter(Archivo.id == archivo_id).first()
@@ -1006,6 +1281,99 @@ def eliminar_archivo_procedimiento(
         status_code=303
     )
 
+
+
+
+def _angio_auditoria_evento_dict(e):
+    return {
+        "schema_version": "audit_event_v1",
+        "original_id": e.id,
+        "creado_en": e.creado_en.isoformat() if e.creado_en else None,
+        "usuario": e.usuario,
+        "ip": e.ip,
+        "dispositivo": getattr(e, "dispositivo", None),
+        "user_agent": getattr(e, "user_agent", None),
+        "accion": e.accion,
+        "tarea_id": e.tarea_id,
+        "tarea": e.tarea,
+        "estado": e.estado,
+        "caso_id_original": e.caso_id,
+        "archivo_nombre": getattr(e, "archivo_nombre", None),
+        "archivo_bytes": getattr(e, "archivo_bytes", None),
+        "detalle": e.detalle,
+    }
+
+
+def _angio_exportar_auditoria_caso(db: Session, procedimiento_id: int):
+    try:
+        eventos = (
+            db.query(AuditoriaEvento)
+            .filter(AuditoriaEvento.caso_id == procedimiento_id)
+            .order_by(AuditoriaEvento.id.asc())
+            .all()
+        )
+    except Exception:
+        eventos = []
+
+    eventos_json = [_angio_auditoria_evento_dict(e) for e in eventos]
+
+    try:
+        actividad_humana = obtener_log_humano_caso(db, procedimiento_id)
+    except Exception:
+        actividad_humana = []
+
+    return eventos_json, actividad_humana
+
+
+def _angio_parse_datetime_or_none(value):
+    if not value:
+        return None
+
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00")).replace(tzinfo=None)
+    except Exception:
+        return None
+
+
+def _angio_importar_auditoria_caso(db: Session, procedimiento_id: int, eventos_importados: list, nombre_zip: str = ""):
+    """
+    Restaura eventos de auditoría asociados al nuevo caso importado.
+
+    Nota:
+    - Mantiene el timestamp original si viene en el ZIP.
+    - Cambia caso_id al nuevo procedimiento_id.
+    - Marca en detalle que el evento proviene de importación.
+    """
+    restaurados = 0
+
+    for item in eventos_importados or []:
+        try:
+            detalle = item.get("detalle") or ""
+            detalle_import = f"{detalle}; importado_desde_zip={nombre_zip}; caso_id_original={item.get('caso_id_original')}".strip("; ")
+
+            evento = AuditoriaEvento(
+                creado_en=_angio_parse_datetime_or_none(item.get("creado_en")) or datetime.utcnow(),
+                usuario=item.get("usuario"),
+                ip=item.get("ip"),
+                dispositivo=item.get("dispositivo"),
+                user_agent=item.get("user_agent"),
+                accion=item.get("accion") or "IMPORTED_AUDIT_EVENT",
+                tarea_id=item.get("tarea_id"),
+                tarea=item.get("tarea"),
+                estado=item.get("estado"),
+                caso_id=procedimiento_id,
+                archivo_nombre=item.get("archivo_nombre"),
+                archivo_bytes=item.get("archivo_bytes"),
+                detalle=detalle_import,
+            )
+
+            db.add(evento)
+            restaurados += 1
+
+        except Exception:
+            continue
+
+    return restaurados
 
 @router.get("/procedimientos/{procedimiento_id}/exportar")
 def exportar_procedimiento_zip(
@@ -1059,6 +1427,8 @@ def exportar_procedimiento_zip(
         a for a in archivos
         if (a.tipo or "").lower() in ["zip", "dicom"]
     ]
+
+    audit_events_export, case_activity_export = _angio_exportar_auditoria_caso(db, procedimiento.id)
 
     export_dir = Path(DATA_PATH) / "exports"
     export_dir.mkdir(parents=True, exist_ok=True)
@@ -1153,6 +1523,12 @@ def exportar_procedimiento_zip(
             }
             for a in archivos_excluidos
         ],
+        "audit": {
+            "events_count": len(audit_events_export),
+            "activity_lines_count": len(case_activity_export),
+            "events_path": "audit/case_audit_events.json",
+            "activity_path": "audit/case_activity.txt",
+        },
         "extra_fields": {},
     }
 
@@ -1192,6 +1568,13 @@ def exportar_procedimiento_zip(
     md_lines.append("")
     md_lines.append("## Notas adicionales")
     md_lines.append(procedimiento.notas_adicionales or "")
+    md_lines.append("")
+    md_lines.append("## Actividad del caso")
+    if case_activity_export:
+        for linea in case_activity_export:
+            md_lines.append(f"- {linea}")
+    else:
+        md_lines.append("Sin actividad relevante registrada.")
 
     with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zipf:
         zipf.writestr("case.json", json.dumps(case_data, ensure_ascii=False, indent=2))
@@ -1271,6 +1654,53 @@ def _angio_tipo_por_nombre(nombre: str | None) -> str:
     return "archivo"
 
 
+
+
+def _angio_es_dicom_por_contenido(ruta: Path) -> bool:
+    """
+    Detecta DICOM Part 10 por contenido, no por extensión.
+    Muchos angiógrafos exportan archivos DICOM sin .dcm.
+    """
+    try:
+        with open(ruta, "rb") as f:
+            head = f.read(132)
+
+        return len(head) >= 132 and head[128:132] == b"DICM"
+
+    except Exception:
+        return False
+
+
+def _angio_debe_intentar_orthanc(nombre: str | None, ruta: Path | None = None, contexto_zip: bool = False) -> bool:
+    """
+    Decide si un archivo debe enviarse a Orthanc.
+
+    Reglas:
+    - Extensión DICOM conocida: sí.
+    - Marcador DICM en contenido: sí.
+    - Archivo sin extensión dentro de ZIP: probar Orthanc como posible DICOM.
+      Esto cubre exportaciones de angiógrafos.
+    """
+    tipo = _angio_tipo_por_nombre(nombre)
+
+    if tipo == "dicom":
+        return True
+
+    if ruta is not None and _angio_es_dicom_por_contenido(ruta):
+        return True
+
+    ext = Path(nombre or "").suffix.lower()
+
+    if contexto_zip and not ext:
+        try:
+            if ruta is not None and ruta.exists() and ruta.stat().st_size > 512:
+                return True
+        except Exception:
+            return True
+
+    return False
+
+
 def _angio_guardar_bytes(procedimiento_id: int, nombre_original: str, data: bytes, subcarpeta: str = "web") -> Path:
     carpeta = Path(DATA_PATH) / subcarpeta / str(procedimiento_id)
     carpeta.mkdir(parents=True, exist_ok=True)
@@ -1291,10 +1721,11 @@ def _angio_crear_archivo(
     origen: str,
     categoria: str | None = None,
     caption: str | None = None,
+    tipo_override: str | None = None,
 ):
     archivo = Archivo(
         procedimiento_id=procedimiento_id,
-        tipo=_angio_tipo_por_nombre(nombre_original),
+        tipo=tipo_override or _angio_tipo_por_nombre(nombre_original),
         categoria=categoria,
         caption=caption,
         origen=origen,
@@ -1366,74 +1797,160 @@ async def subir_archivo_procedimiento_robusto(
     if not recibidos:
         return RedirectResponse(url=f"/procedimientos/{procedimiento_id}", status_code=303)
 
-    for upload in recibidos:
-        nombre = _angio_nombre_seguro(upload.filename)
-        data = await upload.read()
+    task_id = start_task(
+        "subir_archivos",
+        request=request,
+        case_id=procedimiento_id,
+        detalle=f"cantidad_archivos={len(recibidos)}",
+        db=db,
+    )
 
-        if not data:
-            continue
+    try:
+        for upload in recibidos:
+            nombre = _angio_nombre_seguro(upload.filename)
+            data = await upload.read()
 
-        tipo = _angio_tipo_por_nombre(nombre)
-        ruta = _angio_guardar_bytes(procedimiento_id, nombre, data, subcarpeta="web")
+            log_upload_file(
+                case_id=procedimiento_id,
+                filename=nombre,
+                size_bytes=len(data) if data else 0,
+                request=request,
+                task_id=task_id,
+                status="ok" if data else "vacio",
+                detalle="archivo_recibido_desde_web",
+                db=db,
+            )
 
-        archivo_db = _angio_crear_archivo(
-            db=db,
-            procedimiento_id=procedimiento_id,
-            ruta=ruta,
-            nombre_original=nombre,
-            origen="web",
-            categoria=categoria,
-            caption=caption,
-        )
+            if not data:
+                continue
 
-        # DICOM suelto
-        if tipo == "dicom":
-            _angio_intentar_orthanc(db, archivo_db, procedimiento_id)
+            tipo = _angio_tipo_por_nombre(nombre)
+            ruta = _angio_guardar_bytes(procedimiento_id, nombre, data, subcarpeta="web")
 
-        # ZIP: guardar original + extraer contenido
-        if tipo == "zip":
-            archivo_db.estado = "zip_original"
+            archivo_db = _angio_crear_archivo(
+                db=db,
+                procedimiento_id=procedimiento_id,
+                ruta=ruta,
+                nombre_original=nombre,
+                origen="web",
+                categoria=categoria,
+                caption=caption,
+            )
 
-            carpeta_extraida = ruta.parent / f"zip_{archivo_db.id}"
-            carpeta_extraida.mkdir(parents=True, exist_ok=True)
+            # DICOM suelto, incluyendo archivos sin extensión pero con contenido DICOM
+            if _angio_debe_intentar_orthanc(nombre, ruta, contexto_zip=False):
+                archivo_db.tipo = "dicom"
+                _angio_intentar_orthanc(db, archivo_db, procedimiento_id)
 
-            try:
-                with zipfile.ZipFile(ruta, "r") as z:
-                    for member in z.infolist():
-                        if member.is_dir():
-                            continue
+            # ZIP: guardar original + extraer contenido
+            if tipo == "zip":
+                archivo_db.estado = "zip_original"
 
-                        member_name = _angio_nombre_seguro(member.filename)
+                carpeta_extraida = ruta.parent / f"zip_{archivo_db.id}"
+                carpeta_extraida.mkdir(parents=True, exist_ok=True)
 
-                        if not member_name or member_name.startswith("."):
-                            continue
+                zip_extraidos_count = 0
+                zip_extraidos_bytes = 0
 
-                        destino = carpeta_extraida / member_name
+                try:
+                    with zipfile.ZipFile(ruta, "r") as z:
+                        for member in z.infolist():
+                            if member.is_dir():
+                                continue
 
-                        with z.open(member) as src, open(destino, "wb") as dst:
-                            shutil.copyfileobj(src, dst)
+                            member_name = _angio_nombre_seguro(member.filename)
 
-                        extraido_db = _angio_crear_archivo(
-                            db=db,
-                            procedimiento_id=procedimiento_id,
-                            ruta=destino,
-                            nombre_original=member_name,
-                            origen="zip",
-                            categoria=categoria,
-                            caption=caption,
-                        )
+                            if not member_name or member_name.startswith("."):
+                                continue
 
-                        if _angio_tipo_por_nombre(member_name) == "dicom":
-                            _angio_intentar_orthanc(db, extraido_db, procedimiento_id)
+                            destino = carpeta_extraida / member_name
 
-            except zipfile.BadZipFile:
-                archivo_db.estado = "error_zip"
-                archivo_db.razon_match = "ZIP inválido o corrupto."
+                            with z.open(member) as src, open(destino, "wb") as dst:
+                                shutil.copyfileobj(src, dst)
 
+                            size_extraido = destino.stat().st_size if destino.exists() else 0
+                            zip_extraidos_count += 1
+                            zip_extraidos_bytes += size_extraido
+
+
+                            es_dicom_extraido = _angio_debe_intentar_orthanc(
+                                member_name,
+                                destino,
+                                contexto_zip=True,
+                            )
+
+                            extraido_db = _angio_crear_archivo(
+                                db=db,
+                                procedimiento_id=procedimiento_id,
+                                ruta=destino,
+                                nombre_original=member_name,
+                                origen="zip",
+                                categoria=categoria,
+                                caption=caption,
+                                tipo_override="dicom" if es_dicom_extraido else None,
+                            )
+
+                            if es_dicom_extraido:
+                                _angio_intentar_orthanc(db, extraido_db, procedimiento_id)
+
+                    log_zip_summary(
+                        case_id=procedimiento_id,
+                        filename=nombre,
+                        size_bytes=len(data),
+                        extracted_count=zip_extraidos_count,
+                        extracted_bytes=zip_extraidos_bytes,
+                        request=request,
+                        task_id=task_id,
+                        status="ok",
+                        detalle="zip_extraido_correctamente",
+                        db=db,
+                    )
+
+                except zipfile.BadZipFile:
+                    archivo_db.estado = "error_zip"
+                    archivo_db.razon_match = "ZIP inválido o corrupto."
+
+                    log_global(
+                        "ZIP_UPLOAD_FAILED",
+                        request=request,
+                        case_id=procedimiento_id,
+                        task_id=task_id,
+                        task_name="subir_archivos",
+                        status="error",
+                        archivo_nombre=nombre,
+                        archivo_bytes=len(data),
+                        detalle="ZIP inválido o corrupto.",
+                        db=db,
+                    )
+
+            db.commit()
+
+        procedimiento.actualizado_en = datetime.utcnow()
         db.commit()
 
-    procedimiento.actualizado_en = datetime.utcnow()
-    db.commit()
+        finish_task(
+            task_id,
+            "subir_archivos",
+            request=request,
+            case_id=procedimiento_id,
+            status="ok",
+            detalle=f"subida_finalizada; cantidad_archivos={len(recibidos)}",
+            db=db,
+        )
+        db.commit()
+
+    except Exception as e:
+        finish_task(
+            task_id,
+            "subir_archivos",
+            request=request,
+            case_id=procedimiento_id,
+            status="error",
+            detalle=str(e)[:1500],
+            db=db,
+        )
+        db.commit()
+        raise
 
     return RedirectResponse(url=f"/procedimientos/{procedimiento_id}", status_code=303)
 
@@ -1608,6 +2125,15 @@ async def importar_caso_post(
             case_data = json.loads(z.read("case.json").decode("utf-8"))
             case = case_data.get("case") or {}
 
+            audit_events_import = []
+            if "audit/case_audit_events.json" in nombres_zip:
+                try:
+                    audit_events_import = json.loads(z.read("audit/case_audit_events.json").decode("utf-8"))
+                except Exception:
+                    audit_events_import = []
+            elif isinstance(case_data.get("audit_events"), list):
+                audit_events_import = case_data.get("audit_events") or []
+
             edad_raw = case.get("edad")
             edad_int = int(edad_raw) if edad_raw is not None and str(edad_raw).isdigit() else None
 
@@ -1764,6 +2290,28 @@ async def importar_caso_post(
                         estado="asociado",
                     )
                 )
+
+            eventos_auditoria_restaurados = _angio_importar_auditoria_caso(
+                db=db,
+                procedimiento_id=procedimiento.id,
+                eventos_importados=audit_events_import,
+                nombre_zip=nombre_zip,
+            )
+
+            db.add(
+                AuditoriaEvento(
+                    usuario=request.session.get("user") or "importador",
+                    ip=request.client.host if request.client else None,
+                    dispositivo="importacion",
+                    accion="CASE_IMPORTED",
+                    tarea="importar_caso",
+                    estado="ok",
+                    caso_id=procedimiento.id,
+                    archivo_nombre=nombre_zip,
+                    archivo_bytes=len(data),
+                    detalle=f"caso_importado_desde_zip; eventos_auditoria_restaurados={eventos_auditoria_restaurados}",
+                )
+            )
 
             db.commit()
 

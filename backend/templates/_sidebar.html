@@ -21,6 +21,9 @@
     <a class="side-link {% if path.startswith('/repositorios') %}active{% endif %}" href="/repositorios">Repositorios / tags</a>
     <a class="side-link {% if path.startswith('/auditoria') %}active{% endif %}" href="/auditoria">Auditoría</a>
     {% if request.session.get("rol") == "admin" %}
+    <a class="side-link {% if path.startswith('/auditoria-sistema') %}active{% endif %}" href="/auditoria-sistema">Log general</a>
+    {% endif %}
+    {% if request.session.get("rol") == "admin" %}
     <a class="side-link {% if path.startswith('/admin/casos-borrar') %}active{% endif %}" href="/admin/casos-borrar">Eliminar casos</a>
     {% endif %}
 

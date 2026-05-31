@@ -544,13 +544,18 @@ Complicaciones: {% if procedimiento.complicaciones_si_no %}{{ procedimiento.comp
         <label>Archivos</label>
 
         <div id="upload-zone" class="upload-zone">
-            <input id="upload-input" type="file" name="archivos" multiple required>
+            <input id="upload-input" type="file" multiple required name="archivos" multiple>
             <div class="upload-zone-title">Arrastra archivos aquí</div>
             <div class="small">o haz clic para seleccionarlos desde el computador</div>
         </div>
 
         <div id="upload-file-list" class="upload-file-list small">
             Sin archivos seleccionados.
+        </div>
+
+        <div id="upload-status" class="upload-status small" style="display:none;"></div>
+        <div class="upload-progress-wrap" id="upload-progress-wrap" style="display:none;">
+            <div class="upload-progress-bar" id="upload-progress-bar"></div>
         </div>
 
         <label>Categoría</label>
@@ -563,56 +568,7 @@ Complicaciones: {% if procedimiento.complicaciones_si_no %}{{ procedimiento.comp
     </form>
 </div>
 
-<script>
-document.addEventListener("DOMContentLoaded", function () {
-    const zone = document.getElementById("upload-zone");
-    const input = document.getElementById("upload-input");
-    const list = document.getElementById("upload-file-list");
 
-    if (!zone || !input || !list) return;
-
-    function renderFiles(files) {
-        if (!files || files.length === 0) {
-            list.textContent = "Sin archivos seleccionados.";
-            return;
-        }
-
-        const names = Array.from(files).map(function (f) {
-            const mb = f.size ? (f.size / 1024 / 1024).toFixed(1) + " MB" : "";
-            return "• " + f.name + (mb ? " (" + mb + ")" : "");
-        });
-
-        list.textContent = files.length + " archivo(s) seleccionado(s):\n" + names.join("\n");
-    }
-
-    zone.addEventListener("click", function () {
-        input.click();
-    });
-
-    input.addEventListener("change", function () {
-        renderFiles(input.files);
-    });
-
-    zone.addEventListener("dragover", function (event) {
-        event.preventDefault();
-        zone.classList.add("dragover");
-    });
-
-    zone.addEventListener("dragleave", function () {
-        zone.classList.remove("dragover");
-    });
-
-    zone.addEventListener("drop", function (event) {
-        event.preventDefault();
-        zone.classList.remove("dragover");
-
-        if (event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files.length > 0) {
-            input.files = event.dataTransfer.files;
-            renderFiles(input.files);
-        }
-    });
-});
-</script>
 
 <h2 style="color:#f7f3e8;">Estudios DICOM</h2>
 <form method="post" action="/procedimientos/{{ procedimiento.id }}/dicom/reintentar-orthanc" style="margin-bottom: 16px;">
@@ -783,6 +739,22 @@ document.addEventListener("DOMContentLoaded", function () {
     <option value="otro">
 </datalist>
 
+
+<div class="card">
+    <h2 class="card-title">Actividad del caso</h2>
+    <p class="muted">Resumen legible de acciones relevantes completadas en la ficha del caso.</p>
+
+    {% if log_caso_humano %}
+        <ul class="case-activity">
+        {% for linea in log_caso_humano %}
+            <li>{{ linea }}</li>
+        {% endfor %}
+        </ul>
+    {% else %}
+        <p class="muted">Este caso aún no tiene actividad relevante registrada.</p>
+    {% endif %}
+</div>
+
 </main>
 
 <script>
@@ -824,44 +796,92 @@ document.addEventListener("DOMContentLoaded", function() {
 <!-- NeuroPACS: alerta de cambios no guardados -->
 <div id="save-status" class="save-status saved" style="display:none;">Guardado</div>
 
+
+
+
 <script>
 document.addEventListener("DOMContentLoaded", function () {
-    let dirty = false;
-    const status = document.getElementById("save-status");
+    const form = document.getElementById("upload-form");
+    const zone = document.getElementById("upload-zone");
+    const input = document.getElementById("upload-input");
+    const list = document.getElementById("upload-file-list");
+    const status = document.getElementById("upload-status");
+
+    function setClientTimezoneCookies() {
+        try {
+            const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
+            const offset = String(new Date().getTimezoneOffset());
+
+            document.cookie = "client_timezone=" + encodeURIComponent(tz) + "; path=/; SameSite=Lax";
+            document.cookie = "client_utc_offset_minutes=" + encodeURIComponent(offset) + "; path=/; SameSite=Lax";
+        } catch (e) {
+            // Sin timezone disponible: el backend usará fallback.
+        }
+    }
 
     function showStatus(text, cls) {
         if (!status) return;
         status.style.display = "block";
         status.textContent = text;
-        status.className = "save-status " + cls;
+        status.className = "upload-status small " + (cls || "");
     }
 
-    function setDirty() {
-        dirty = true;
-        showStatus("Cambios sin guardar", "dirty");
-    }
+    function renderFiles(files) {
+        if (!list) return;
 
-    const fields = document.querySelectorAll("input, textarea, select");
-    const forms = document.querySelectorAll("form");
+        if (!files || files.length === 0) {
+            list.textContent = "Sin archivos seleccionados.";
+            return;
+        }
 
-    fields.forEach(function (field) {
-        field.addEventListener("input", setDirty);
-        field.addEventListener("change", setDirty);
-    });
+        const total = files.length;
+        const limit = 20;
 
-    forms.forEach(function (form) {
-        form.addEventListener("submit", function () {
-            dirty = false;
-            showStatus("Guardando...", "saving");
+        const shown = Array.from(files).slice(0, limit).map(function (f) {
+            const mb = f.size ? (f.size / 1024 / 1024).toFixed(1) + " MB" : "";
+            return "• " + f.name + (mb ? " (" + mb + ")" : "");
         });
-    });
 
-    window.addEventListener("beforeunload", function (event) {
-        if (!dirty) return;
+        let texto = total + " archivo(s) seleccionado(s):\n" + shown.join("\n");
 
-        event.preventDefault();
-        event.returnValue = "";
-    });
+        if (total > limit) {
+            texto += "\n• ... " + (total - limit) + " archivo(s) más";
+        }
+
+        list.textContent = texto;
+    }
+
+    setClientTimezoneCookies();
+
+    if (zone && input) {
+        zone.addEventListener("click", function () {
+            input.click();
+        });
+
+        // Deshabilitado intencionalmente: drag/drop de carpetas o muchos DICOM puede colgar Chrome.
+        ["dragenter", "dragover", "dragleave", "drop"].forEach(function (eventName) {
+            zone.addEventListener(eventName, function (event) {
+                event.preventDefault();
+                event.stopPropagation();
+                showStatus("Drag and drop deshabilitado temporalmente. Usa Seleccionar archivos.", "info");
+            });
+        });
+    }
+
+    if (input) {
+        input.addEventListener("change", function () {
+            renderFiles(input.files);
+            showStatus("Archivos listos. Presiona Subir archivos.", "info");
+        });
+    }
+
+    if (form) {
+        form.addEventListener("submit", function () {
+            setClientTimezoneCookies();
+            showStatus("Subiendo archivos. No cierres esta pestaña.", "saving");
+            // No usamos preventDefault: subida clásica, más estable.
+        });
+    }
 });
 </script>
 

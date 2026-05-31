@@ -252,3 +252,42 @@ class Usuario(Base):
     activo = Column(String(10), default="si")
 
     creado_en = Column(DateTime, default=datetime.utcnow)
+
+
+class AuditoriaEvento(Base):
+    __tablename__ = "auditoria_eventos"
+
+    def __init__(self, **kwargs):
+        """
+        Constructor tolerante a versiones.
+        Si un ZIP o una versión futura trae campos desconocidos,
+        se ignoran en vez de romper la importación.
+        """
+        columnas = set(self.__table__.columns.keys())
+        for clave, valor in kwargs.items():
+            if clave in columnas:
+                setattr(self, clave, valor)
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    creado_en = Column(DateTime, default=datetime.utcnow, index=True)
+
+    usuario = Column(String(255), index=True, nullable=True)
+    ip = Column(String(100), nullable=True)
+    dispositivo = Column(String(50), index=True, nullable=True)
+    user_agent = Column(Text, nullable=True)
+    client_timezone = Column(String(100), index=True, nullable=True)
+    client_utc_offset_minutes = Column(Integer, nullable=True)
+
+    accion = Column(String(100), index=True, nullable=False)
+
+    tarea_id = Column(String(100), index=True, nullable=True)
+    tarea = Column(String(255), index=True, nullable=True)
+    estado = Column(String(100), index=True, nullable=True)
+
+    caso_id = Column(Integer, index=True, nullable=True)
+
+    archivo_nombre = Column(Text, nullable=True)
+    archivo_bytes = Column(Integer, nullable=True)
+
+    detalle = Column(Text, nullable=True)

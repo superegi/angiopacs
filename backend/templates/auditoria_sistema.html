@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Log general</title>
+<link rel="stylesheet" href="/static/css/style.css">
+</head>
+
+<body>
+<div class="app-shell">
+
+{% include "_sidebar.html" %}
+
+<section class="main-panel">
+<header class="topbar">
+    <div class="brand">
+        <h1>Log general</h1>
+        <span>Auditoría completa del sistema · Solo administradores</span>
+    </div>
+</header>
+
+<main class="container">
+
+<div class="card">
+    <h2 class="card-title">Filtros</h2>
+
+    <form method="get" action="/auditoria-sistema" class="filters">
+        <input name="caso_id" placeholder="Caso ID" value="{{ caso_id }}">
+        <input name="usuario" placeholder="Usuario" value="{{ usuario }}">
+        <input name="tarea" placeholder="Tarea" value="{{ tarea }}">
+        <input name="accion" placeholder="Acción" value="{{ accion }}">
+
+        <select name="estado">
+            <option value="">Estado</option>
+            <option value="started" {% if estado == "started" %}selected{% endif %}>started</option>
+            <option value="ok" {% if estado == "ok" %}selected{% endif %}>ok</option>
+            <option value="error" {% if estado == "error" %}selected{% endif %}>error</option>
+            <option value="vacio" {% if estado == "vacio" %}selected{% endif %}>vacio</option>
+        </select>
+
+        <select name="dispositivo">
+            <option value="">Dispositivo</option>
+            <option value="PC" {% if dispositivo == "PC" %}selected{% endif %}>PC</option>
+            <option value="celular" {% if dispositivo == "celular" %}selected{% endif %}>celular</option>
+            <option value="tablet" {% if dispositivo == "tablet" %}selected{% endif %}>tablet</option>
+            <option value="api" {% if dispositivo == "api" %}selected{% endif %}>api</option>
+        </select>
+
+        <button type="submit">Filtrar</button>
+        <a class="button-secondary" href="/auditoria-sistema">Limpiar</a>
+    </form>
+</div>
+
+<div class="card">
+    <h2 class="card-title">Eventos</h2>
+
+    <table class="table">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Fecha UTC</th>
+                <th>Usuario</th>
+                <th>Dispositivo</th>
+                <th>Acción</th>
+                <th>Tarea</th>
+                <th>Estado</th>
+                <th>Caso</th>
+                <th>Archivo</th>
+                <th>Bytes</th>
+                <th>Detalle</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for e in eventos %}
+            <tr>
+                <td>{{ e.id }}</td>
+                <td>{{ e.creado_en }}</td>
+                <td>{{ e.usuario }}</td>
+                <td>{{ e.dispositivo }}</td>
+                <td>{{ e.accion }}</td>
+                <td>{{ e.tarea }}</td>
+                <td>{{ e.estado }}</td>
+                <td>
+                    {% if e.caso_id %}
+                        <a href="/procedimientos/{{ e.caso_id }}">{{ e.caso_id }}</a>
+                    {% endif %}
+                </td>
+                <td>{{ e.archivo_nombre }}</td>
+                <td>{{ e.archivo_bytes }}</td>
+                <td>{{ e.detalle }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+</main>
+</section>
+</div>
+</body>
+</html>
