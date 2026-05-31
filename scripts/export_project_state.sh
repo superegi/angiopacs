@@ -34,6 +34,17 @@ mask_env_file() {
   ' "$f"
 }
 
+mask_sensitive_stream() {
+  sed -E '
+    s#([Pp][Aa][Ss][Ss][Ww][Oo][Rr][Dd][=:][[:space:]]*)[^[:space:]]+#\1***MASKED***#g;
+    s#([Ss][Ee][Cc][Rr][Ee][Tt][=:][[:space:]]*)[^[:space:]]+#\1***MASKED***#g;
+    s#([Tt][Oo][Kk][Ee][Nn][=:][[:space:]]*)[^[:space:]]+#\1***MASKED***#g;
+    s#([Kk][Ee][Yy][=:][[:space:]]*)[^[:space:]]+#\1***MASKED***#g;
+    s#(DATABASE_URL[:=][[:space:]]*)[^[:space:]]+#\1***MASKED***#g;
+    s#(postgresql://[^:]+:)[^@]+(@)#\1***MASKED***\2#g;
+  '
+}
+
 section() {
   echo
   echo "==================== $1 ===================="
@@ -81,6 +92,54 @@ else
     -print | sort
 fi
 
+
+section "ESTRUCTURA ENFOCADA PARA DESARROLLO"
+echo "Objetivo: vista rápida de archivos relevantes para editar código."
+
+echo
+echo "----- tree backend -L 3 -----"
+tree backend -L 3 2>/dev/null || find backend -maxdepth 3 -print | sort
+
+echo
+echo "----- tree backend/templates -L 2 -----"
+tree backend/templates -L 2 2>/dev/null || find backend/templates -maxdepth 2 -print | sort
+
+echo
+echo "----- tree backend/db -L 2 -----"
+tree backend/db -L 2 2>/dev/null || find backend/db -maxdepth 2 -print | sort
+
+echo
+echo "----- tree docs -L 2 -----"
+tree docs -L 2 2>/dev/null || find docs -maxdepth 2 -print | sort
+
+section "ARCHIVOS CLAVE PARA USUARIOS Y LOGIN"
+for f in \
+  backend/models.py \
+  backend/main.py \
+  backend/routers/usuarios.py \
+  backend/templates/login.html \
+  backend/templates/usuarios.html \
+  backend/templates/_sidebar.html \
+  backend/db/migrations.py
+do
+  echo
+  echo "============================================================"
+  echo "FILE CLAVE: $f"
+  echo "============================================================"
+  if [ -f "$f" ]; then
+    sed -n '1,260p' "$f"
+  else
+    echo "No existe"
+  fi
+done
+
+section "RUTAS FASTAPI DETECTADAS"
+grep -RInE '^[[:space:]]*@.*\.(get|post|put|delete|patch)\(' backend/*.py backend/routers/*.py 2>/dev/null || true
+
+section "CLASES SQLALCHEMY DETECTADAS"
+grep -nE '^class ' backend/models.py 2>/dev/null || true
+
+
 section "GIT INFO"
 if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   run_cmd git branch --show-current
@@ -104,7 +163,9 @@ if command -v docker >/dev/null 2>&1; then
   run_cmd docker compose version
   run_cmd docker compose ps
   run_cmd docker images
-  run_cmd docker compose config
+  echo
+  echo "----- docker compose config sanitizado -----"
+  docker compose config 2>&1 | mask_sensitive_stream || true
   run_cmd docker compose logs --tail=120 backend-bot
   run_cmd docker compose logs --tail=120 orthanc-pacs
   run_cmd docker compose logs --tail=80 postgres-db
