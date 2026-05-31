@@ -1,7 +1,9 @@
 from pathlib import Path
 import os
+import time
 
 from fastapi import FastAPI, Request, Depends, Form
+from passlib.context import CryptContext
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
@@ -13,7 +15,7 @@ from routers.webhook import router as webhook_router
 from routers.pacientes import router as pacientes_router
 from database import engine, get_db
 from db.migrations import aplicar_migraciones_seguras
-from models import Base, Procedimiento, ParticipanteProcedimiento
+from models import Base, Procedimiento, ParticipanteProcedimiento, Usuario
 
 from routers.usuarios import router as usuarios_router
 
@@ -25,6 +27,11 @@ BASE_DIR = Path(__file__).resolve().parent
 APP_USER = os.getenv("ANGIOPACS_USER", "egidio")
 APP_PASSWORD = os.getenv("ANGIOPACS_PASSWORD", "cambia_esta_clave")
 SESSION_SECRET = os.getenv("ANGIOPACS_SESSION_SECRET", "cambia_este_secreto_largo")
+
+pwd_context = CryptContext(
+    schemes=["pbkdf2_sha256"],
+    deprecated="auto"
+)
 
 app = FastAPI(
     title="NeuroPACS",
@@ -218,16 +225,73 @@ def login_get(request: Request):
 def login_post(
     request: Request,
     username: str = Form(...),
-    password: str = Form(...)
+    password: str = Form(...),
+    db: Session = Depends(get_db),
 ):
-    BOOTSTRAP_ADMIN = os.getenv("ANGIOPACS_BOOTSTRAP_ADMIN", "true").lower() == "true"
+    login_started = time.monotonic()
 
-    if BOOTSTRAP_ADMIN and username == APP_USER and password == APP_PASSWORD:
+    username = (username or "").strip()
+    password = password or ""
+
+    try:
+        login_delay = float(os.getenv("ANGIOPACS_LOGIN_DELAY_SECONDS", "3"))
+    except ValueError:
+        login_delay = 3.0
+
+    login_delay = max(0.0, min(login_delay, 10.0))
+
+    def aplicar_delay_login():
+        elapsed = time.monotonic() - login_started
+        restante = login_delay - elapsed
+        if restante > 0:
+            time.sleep(restante)
+
+    def usuario_activo(valor):
+        if valor is True:
+            return True
+        texto = str(valor or "").strip().lower()
+        return texto in ["si", "sí", "true", "1", "activo", "active"]
+
+    bootstrap_admin = os.getenv("ANGIOPACS_BOOTSTRAP_ADMIN", "true").lower() == "true"
+
+    # 1) Usuario bootstrap desde .env
+    if bootstrap_admin and username == APP_USER and password == APP_PASSWORD:
+        aplicar_delay_login()
+
         request.session["auth"] = True
         request.session["user"] = username
         request.session["rol"] = "admin"
         request.session["bootstrap_admin"] = True
+
         return RedirectResponse(url="/", status_code=303)
+
+    # 2) Usuarios reales creados en la base de datos
+    usuario = (
+        db.query(Usuario)
+        .filter(Usuario.username == username)
+        .first()
+    )
+
+    password_ok = False
+
+    if usuario and usuario.password_hash:
+        try:
+            password_ok = pwd_context.verify(password, usuario.password_hash)
+        except Exception:
+            password_ok = False
+
+    if usuario and usuario_activo(usuario.activo) and password_ok:
+        aplicar_delay_login()
+
+        request.session["auth"] = True
+        request.session["user"] = usuario.username
+        request.session["user_id"] = usuario.id
+        request.session["rol"] = usuario.rol or "comun"
+        request.session["bootstrap_admin"] = False
+
+        return RedirectResponse(url="/", status_code=303)
+
+    aplicar_delay_login()
 
     return templates.TemplateResponse(
         request=request,
