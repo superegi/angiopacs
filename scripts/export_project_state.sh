@@ -1,28 +1,19 @@
 #!/usr/bin/env bash
-set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
 TS="$(date +%Y%m%d_%H%M%S)"
 OUT="ANGIO_DIAG_project_state_${TS}.txt"
-
 MAX_BYTES="${MAX_BYTES:-250000}"
 
 is_text_file() {
   local f="$1"
+  [ -f "$f" ] || return 1
 
-  if [ ! -f "$f" ]; then
-    return 1
-  fi
-
-  # evitar archivos grandes
   local size
   size=$(stat -c%s "$f" 2>/dev/null || echo 0)
-  if [ "$size" -gt "$MAX_BYTES" ]; then
-    return 1
-  fi
+  [ "$size" -le "$MAX_BYTES" ] || return 1
 
-  # evitar binarios
   if file --mime "$f" 2>/dev/null | grep -qE 'charset=binary'; then
     return 1
   fi
@@ -32,10 +23,7 @@ is_text_file() {
 
 mask_env_file() {
   local f="$1"
-
-  if [ ! -f "$f" ]; then
-    return 0
-  fi
+  [ -f "$f" ] || return 0
 
   sed -E '
     s#^(.*PASSWORD=).*#\1***MASKED***#;
@@ -44,6 +32,17 @@ mask_env_file() {
     s#^(.*KEY=).*#\1***MASKED***#;
     s#^(DATABASE_URL=).*#\1***MASKED***#;
   ' "$f"
+}
+
+section() {
+  echo
+  echo "==================== $1 ===================="
+}
+
+run_cmd() {
+  echo
+  echo "----- $* -----"
+  "$@" 2>&1 || true
 }
 
 {
@@ -57,11 +56,20 @@ echo "Archivo: $OUT"
 echo "MAX_BYTES por archivo: $MAX_BYTES"
 echo "============================================================"
 
-echo
-echo "==================== TREE DEL PROYECTO ===================="
+section "MAQUINA LOCAL"
+run_cmd hostnamectl
+run_cmd uname -a
+run_cmd lsb_release -a
+run_cmd whoami
+run_cmd id
+run_cmd pwd
+run_cmd df -h .
+run_cmd free -h
+
+section "TREE DEL PROYECTO"
 if command -v tree >/dev/null 2>&1; then
   tree -a \
-    -I '.git|.env|config/orthanc.json|orthanc-storage|fotos_pacientes|__pycache__|*.pyc|*.bak_*|ANGIO_DIAG_*|*.tar.gz|*.zip|*.dcm|*.ima|*.sqlite|*.db|node_modules|postgres_data' \
+    -I '.git|.env|config/orthanc.json|orthanc-storage|fotos_pacientes|__pycache__|*.pyc|*.bak_*|ANGIO_DIAG_*|*.tar.gz|*.zip|*.dcm|*.ima|*.sqlite|*.db|node_modules|postgres_data|data|volumes|storage' \
     .
 else
   find . \
@@ -73,64 +81,72 @@ else
     -print | sort
 fi
 
-echo
-echo "==================== GIT INFO ===================="
+section "GIT INFO"
 if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  echo
-  echo "----- git branch -----"
-  git branch --show-current || true
-
-  echo
-  echo "----- git remote -v -----"
-  git remote -v || true
-
-  echo
-  echo "----- git status --short -----"
-  git status --short || true
-
-  echo
-  echo "----- git log --oneline -n 20 -----"
-  git log --oneline -n 20 || true
-
-  echo
-  echo "----- git tag --sort=-creatordate | head -20 -----"
-  git tag --sort=-creatordate | head -20 || true
-
-  echo
-  echo "----- git diff --stat -----"
-  git diff --stat || true
-
-  echo
-  echo "----- git diff --cached --stat -----"
-  git diff --cached --stat || true
+  run_cmd git branch --show-current
+  run_cmd git branch -vv
+  run_cmd git remote -v
+  run_cmd git rev-parse HEAD
+  run_cmd git status --short
+  run_cmd git status --ignored --short
+  run_cmd git ls-files --others --exclude-standard
+  run_cmd git log --oneline -n 30
+  run_cmd git tag --sort=-creatordate
+  run_cmd git diff --stat
+  run_cmd git diff --cached --stat
 else
   echo "No es repositorio Git."
 fi
 
-echo
-echo "==================== DOCKER INFO ===================="
+section "DOCKER INFO"
 if command -v docker >/dev/null 2>&1; then
-  echo
-  echo "----- docker compose ps -----"
-  docker compose ps 2>/dev/null || sudo docker compose ps 2>/dev/null || true
-
-  echo
-  echo "----- docker images relevantes -----"
-  docker images | grep -Ei 'angiopacs|orthanc|postgres' || true
-
-  echo
-  echo "----- logs backend tail 80 -----"
-  docker compose logs --tail=80 backend-bot 2>/dev/null || sudo docker compose logs --tail=80 backend-bot 2>/dev/null || true
-
-  echo
-  echo "----- logs orthanc tail 80 -----"
-  docker compose logs --tail=80 orthanc-pacs 2>/dev/null || sudo docker compose logs --tail=80 orthanc-pacs 2>/dev/null || true
+  run_cmd docker version
+  run_cmd docker compose version
+  run_cmd docker compose ps
+  run_cmd docker images
+  run_cmd docker compose config
+  run_cmd docker compose logs --tail=120 backend-bot
+  run_cmd docker compose logs --tail=120 orthanc-pacs
+  run_cmd docker compose logs --tail=80 postgres-db
 else
   echo "Docker no disponible."
 fi
 
-echo
-echo "==================== ENV LOCAL SANITIZADO ===================="
+section "PUERTOS Y RED LOCAL"
+run_cmd ss -ltnp
+run_cmd ip -br addr
+run_cmd ip route
+
+section "HEALTH CHECKS HTTP"
+for url in \
+  "http://localhost:${PORT_BACKEND:-8001}/health" \
+  "http://localhost:${PORT_BACKEND:-8001}/login" \
+  "http://localhost:${PORT_BACKEND:-8001}/" \
+  "http://localhost:${PORT_BACKEND:-8001}/usuarios" \
+  "http://localhost:${PORT_BACKEND:-8001}/repositorios" \
+  "http://localhost:${PORT_BACKEND:-8001}/auditoria" \
+  "http://localhost:${PORT_ORTHANC_WEB:-8043}/system"
+do
+  echo
+  echo "----- $url -----"
+  curl -k -s -o /tmp/angio_check_body.txt -w "HTTP %{http_code}\n" "$url" 2>&1 || true
+  head -c 500 /tmp/angio_check_body.txt 2>/dev/null || true
+  echo
+done
+
+section "POSTGRES DIAGNOSTICO BASICO"
+if command -v docker >/dev/null 2>&1; then
+  docker compose exec -T postgres-db psql -U "${POSTGRES_USER:-admin_angio}" -d "${POSTGRES_DB:-angiopacs_db}" -c "\dt" 2>&1 || true
+  docker compose exec -T postgres-db psql -U "${POSTGRES_USER:-admin_angio}" -d "${POSTGRES_DB:-angiopacs_db}" -c "\d usuarios" 2>&1 || true
+  docker compose exec -T postgres-db psql -U "${POSTGRES_USER:-admin_angio}" -d "${POSTGRES_DB:-angiopacs_db}" -c "\d procedimientos" 2>&1 || true
+fi
+
+section "TAMAÑO DE CARPETAS RELEVANTES"
+du -sh . 2>/dev/null || true
+du -sh backend config docs scripts 2>/dev/null || true
+find . -maxdepth 3 -type d \( -name data -o -name volumes -o -name storage -o -name orthanc-storage -o -name postgres_data \) -print -exec du -sh {} \; 2>/dev/null || true
+
+section "ENV LOCAL SANITIZADO"
 if [ -f ".env" ]; then
   echo "Archivo .env existe. Valores sensibles enmascarados:"
   mask_env_file ".env"
@@ -138,8 +154,7 @@ else
   echo "No existe .env"
 fi
 
-echo
-echo "==================== ARCHIVOS VERSIONABLES ===================="
+section "ARCHIVOS VERSIONABLES"
 echo "Fuente: git ls-files -co --exclude-standard"
 echo "Nota: se excluyen secretos, datos, binarios, backups y archivos grandes."
 
@@ -156,7 +171,7 @@ while IFS= read -r f; do
     .env|config/orthanc.json|ANGIO_DIAG_*|*.bak_*|*.tar.gz|*.zip|*.dcm|*.ima|*.png|*.jpg|*.jpeg|*.gif|*.webp|*.pdf|*.db|*.sqlite)
       continue
       ;;
-    orthanc-storage/*|fotos_pacientes/*|.git/*|__pycache__/*)
+    orthanc-storage/*|fotos_pacientes/*|.git/*|__pycache__/*|data/*|volumes/*|storage/*|postgres_data/*)
       continue
       ;;
   esac
@@ -178,10 +193,14 @@ while IFS= read -r f; do
   fi
 done <<< "$FILES"
 
-echo
-echo "==================== FIN EXPORT ===================="
+section "FIN EXPORT"
 } > "$OUT" 2>&1
 
 echo "Archivo generado:"
 echo "$OUT"
 ls -lh "$OUT"
+
+echo
+echo "#######################################"
+echo "######    FIN INPUT    ###############"
+echo "#######################################"
