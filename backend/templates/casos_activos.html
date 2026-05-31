@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Casos activos - NeuroPACS</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+
+<div class="app-shell">
+
+<aside class="sidebar">
+    <div class="side-brand">
+        <img src="/static/img/logo-neuropacs.png" alt="NeuroPACS" class="side-brand-logo">
+        <div class="side-brand-text">
+            <h1>NeuroPACS</h1>
+            <p>Neurointervención · Registro clínico</p>
+        </div>
+    </div>
+
+    <div class="side-section">Principal</div>
+    <a class="side-link" href="/">Procedimientos</a>
+    <a class="side-link active" href="/casos-activos">Casos activos</a>
+    <a class="side-link" href="/nuevo-caso">Nuevo caso</a>
+    <a class="side-link" href="/usuarios">Usuarios</a>
+
+    <div class="side-section">Gestión</div>
+    <a class="side-link" href="/repositorios">Repositorios / tags</a>
+    <a class="side-link" href="/auditoria">Auditoría</a>
+
+    <div class="side-section">Usuario</div>
+    <a class="side-link" href="/logout">Cerrar sesión</a>
+</aside>
+
+<section class="main-panel">
+<header class="topbar">
+    <div class="brand">
+        <h1>Casos activos</h1>
+        <span>Abiertos · Hospitalizados · Pendientes de control</span>
+    </div>
+</header>
+
+<main class="container">
+
+    <section class="summary">
+        <div class="metric">
+            <div class="number">{{ conteos.abierto }}</div>
+            <div class="label">abiertos</div>
+        </div>
+        <div class="metric">
+            <div class="number">{{ conteos.hospitalizado }}</div>
+            <div class="label">hospitalizados</div>
+        </div>
+        <div class="metric">
+            <div class="number">{{ conteos.pendiente_control }}</div>
+            <div class="label">pendientes control</div>
+        </div>
+    </section>
+
+    <section class="card">
+        <h2 class="card-title">Listado activo</h2>
+
+        {% if procedimientos %}
+        <div class="table-wrap">
+            <table class="table clinical-table">
+                <thead>
+                    <tr>
+                        <th>N caso</th>
+                        <th>Fecha</th>
+                        <th>Estado</th>
+                        <th>Paciente</th>
+                        <th>Institución</th>
+                        <th>Operadores</th>
+                        <th>Procedimiento</th>
+                        <th>Diagnóstico</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for p in procedimientos %}
+                    <tr>
+                        <td><a href="/procedimientos/{{ p.id }}">#{{ p.id }}</a></td>
+                        <td>{{ p.fecha or "Sin fecha" }}</td>
+                        <td>
+                            <span class="status-pill status-{{ p.estado_caso or 'abierto' }}">
+                                {{ p.estado_caso or "abierto" }}
+                            </span>
+                        </td>
+                        <td>
+                            <a href="/procedimientos/{{ p.id }}">{{ p.paciente }}</a>
+                            {% if p.historia_clinica %}
+                                <div class="small">HC: {{ p.historia_clinica }}</div>
+                            {% endif %}
+                        </td>
+                        <td>{{ p.institucion or "Sin institución" }}</td>
+                        <td>
+                            {% if p.operadores %}
+                                {% for op in p.operadores %}
+                                    <div><span class="badge">{{ op.rol }}</span> {{ op.nombre }}</div>
+                                {% endfor %}
+                            {% else %}
+                                <span class="muted">Sin operadores</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ p.procedimiento or "Sin procedimiento" }}</td>
+                        <td class="diagnosis-cell">{{ p.diagnostico or "Sin diagnóstico" }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+            <p class="small">No hay casos abiertos, hospitalizados ni pendientes de control.</p>
+        {% endif %}
+    </section>
+
+</main>
+</section>
+</div>
+
+</body>
+</html>

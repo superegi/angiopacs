@@ -36,3 +36,10 @@ orthanc-storage/
 *.dcm
 *.sqlite
 *.db
+
+# Diagnósticos locales temporales
+ANGIO_DIAG_*
+
+# Config local generada con secretos
+config/orthanc.json
+/ORTHANC

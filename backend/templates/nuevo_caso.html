@@ -19,6 +19,7 @@
 
     <div class="side-section">Principal</div>
     <a class="side-link" href="/">Procedimientos</a>
+    <a class="side-link" href="/casos-activos">Casos activos</a>
     <a class="side-link" href="/nuevo-caso">Nuevo caso</a>
     <a class="side-link" href="/usuarios">Usuarios</a>
 
@@ -105,6 +106,18 @@
             </div>
         </div>
 
+        <div class="two">
+            <div>
+                <label>Mail paciente</label>
+                <input name="paciente_mail" placeholder="correo@ejemplo.cl">
+            </div>
+
+            <div>
+                <label>Teléfono paciente</label>
+                <input name="paciente_telefono" placeholder="+56 9...">
+            </div>
+        </div>
+
         <h2 class="card-title">Procedimiento</h2>
 
         <div class="two">
@@ -119,8 +132,19 @@
             </div>
 
             <div>
-                <label>Fecha procedimiento</label>
+                <label>Fecha del procedimiento / caso</label>
                 <input id="fecha_procedimiento" name="fecha" type="date">
+                <div class="small">Fecha ingresada manualmente.</div>
+            </div>
+
+            <div>
+                <label>Estado del caso</label>
+                <select name="estado_caso">
+                    <option value="abierto" selected>Abierto</option>
+                    <option value="hospitalizado">Hospitalizado</option>
+                    <option value="pendiente_control">Pendiente control posterior</option>
+                    <option value="de_alta">De alta</option>
+                </select>
             </div>
         </div>
 

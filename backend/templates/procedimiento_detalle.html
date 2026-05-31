@@ -19,6 +19,7 @@
 
     <div class="side-section">Principal</div>
     <a class="side-link" href="/">Procedimientos</a>
+    <a class="side-link" href="/casos-activos">Casos activos</a>
     <a class="side-link" href="/nuevo-caso">Nuevo caso</a>
     <a class="side-link" href="/usuarios">Usuarios</a>
 
@@ -61,6 +62,12 @@
         </p>
 
         <p>
+            <b>Mail:</b> {{ procedimiento.paciente_mail or "—" }}
+            &nbsp; · &nbsp;
+            <b>Teléfono:</b> {{ procedimiento.paciente_telefono or "—" }}
+        </p>
+
+        <p>
             <b>Fecha procedimiento:</b> {{ procedimiento.fecha or "—" }}
             &nbsp; · &nbsp;
             <b>Institución:</b> {{ procedimiento.institucion or "—" }}
@@ -70,6 +77,10 @@
 
         <p>
             <b>Próxima visita:</b> {{ procedimiento.proxima_visita_agendada or "—" }}
+            &nbsp; · &nbsp;
+            <b>Estado:</b> {{ procedimiento.estado_caso or "abierto" }}
+            &nbsp; · &nbsp;
+            <b>Creado/subido:</b> {{ procedimiento.creado_en or "—" }}
         </p>
     </div>
 
@@ -142,6 +153,18 @@
 
         <div class="two">
             <div>
+                <label>Mail paciente</label>
+                <input name="paciente_mail" value="{{ procedimiento.paciente_mail or '' }}" placeholder="correo@ejemplo.cl">
+            </div>
+
+            <div>
+                <label>Teléfono paciente</label>
+                <input name="paciente_telefono" value="{{ procedimiento.paciente_telefono or '' }}" placeholder="+56 9...">
+            </div>
+        </div>
+
+        <div class="two">
+            <div>
                 <label>Institución</label>
                 <input name="institucion" list="instituciones_caso" value="{{ procedimiento.institucion or '' }}" placeholder="Institución">
                 <datalist id="instituciones_caso">
@@ -152,8 +175,19 @@
             </div>
 
             <div>
-                <label>Fecha procedimiento</label>
+                <label>Fecha del procedimiento / caso</label>
                 <input id="fecha_procedimiento" name="fecha" type="date" value="{{ procedimiento.fecha or '' }}">
+                <div class="small">Fecha ingresada manualmente.</div>
+            </div>
+
+            <div>
+                <label>Estado del caso</label>
+                <select name="estado_caso">
+                    <option value="abierto" {% if procedimiento.estado_caso == "abierto" or not procedimiento.estado_caso %}selected{% endif %}>Abierto</option>
+                    <option value="hospitalizado" {% if procedimiento.estado_caso == "hospitalizado" %}selected{% endif %}>Hospitalizado</option>
+                    <option value="pendiente_control" {% if procedimiento.estado_caso == "pendiente_control" %}selected{% endif %}>Pendiente control posterior</option>
+                    <option value="de_alta" {% if procedimiento.estado_caso == "de_alta" %}selected{% endif %}>De alta</option>
+                </select>
             </div>
         </div>
 <button type="submit">Guardar identificación</button>
@@ -397,7 +431,7 @@
 <div class="card">
     <h2 class="card-title">Subir archivo a este caso</h2>
 
-    <form method="post" action="/procedimientos/{{ procedimiento.id }}/subir-archivo" enctype="multipart/form-data">
+    <form method="post" action="/procedimientos/{{ procedimiento.id }}/archivos/subir" enctype="multipart/form-data">
         <label>Archivo</label>
         <input type="file" name="archivo" required>
 
@@ -412,6 +446,71 @@
 </div>
 
 <h2 style="color:#f7f3e8;">Estudios DICOM</h2>
+<form method="post" action="/procedimientos/{{ procedimiento.id }}/dicom/reintentar-orthanc" style="margin-bottom: 16px;">
+    <button type="submit">Reintentar subir DICOM a Orthanc</button>
+</form>
+
+<!-- ANGIO-026/028: diagnóstico visible de DICOM / Orthanc -->
+{% set archivos_caso_diag = archivos if archivos is defined else procedimiento.archivos %}
+{% set ns_dicom = namespace(total=0, vinculados=0, errores=0) %}
+
+{% for archivo in archivos_caso_diag %}
+    {% set nombre_lower = (archivo.nombre_original or archivo.ruta or '')|lower %}
+    {% if archivo.tipo == "dicom" or ".dcm" in nombre_lower or ".ima" in nombre_lower or ".dicom" in nombre_lower %}
+        {% set ns_dicom.total = ns_dicom.total + 1 %}
+
+        {% if archivo.orthanc_study_id %}
+            {% set ns_dicom.vinculados = ns_dicom.vinculados + 1 %}
+        {% endif %}
+
+        {% if archivo.estado and "error" in archivo.estado %}
+            {% set ns_dicom.errores = ns_dicom.errores + 1 %}
+        {% endif %}
+    {% endif %}
+{% endfor %}
+
+<div class="dicom-debug-panel">
+    <div class="dicom-debug-grid">
+        <div class="dicom-debug-box">
+            <div class="number">{{ ns_dicom.total }}</div>
+            <div class="label">DICOM detectados</div>
+        </div>
+
+        <div class="dicom-debug-box">
+            <div class="number">{{ ns_dicom.vinculados }}</div>
+            <div class="label">vinculados a Orthanc</div>
+        </div>
+
+        <div class="dicom-debug-box">
+            <div class="number">{{ ns_dicom.errores }}</div>
+            <div class="label">errores Orthanc/archivo</div>
+        </div>
+    </div>
+
+    {% if ns_dicom.errores > 0 %}
+        <details class="dicom-error-details" open>
+            <summary>Ver errores DICOM / Orthanc</summary>
+
+            {% for archivo in archivos_caso_diag %}
+                {% set nombre_lower = (archivo.nombre_original or archivo.ruta or '')|lower %}
+                {% if archivo.tipo == "dicom" or ".dcm" in nombre_lower or ".ima" in nombre_lower or ".dicom" in nombre_lower %}
+                    {% if archivo.estado and "error" in archivo.estado %}
+                        <div class="dicom-error-item">
+                            <b>Archivo ID {{ archivo.id }}</b> · {{ archivo.nombre_original or archivo.ruta }}
+                            <div class="small">Estado: {{ archivo.estado }}</div>
+                            {% if archivo.razon_match %}
+                                <pre>{{ archivo.razon_match }}</pre>
+                            {% endif %}
+                        </div>
+                    {% endif %}
+                {% endif %}
+            {% endfor %}
+        </details>
+    {% endif %}
+</div>
+
+
+
 
 <div class="grid">
 {% for grupo in dicom_grupos %}
@@ -424,9 +523,16 @@
 
         {% if grupo.study_instance_uid %}
             <a class="btn"
-               href="{{ orthanc_public_url }}/stone-webviewer/index.html?study={{ grupo.study_instance_uid }}"
+               href="{{ orthanc_public_url or 'http://localhost:8042' }}/app/explorer.html#study?uuid={{ grupo.orthanc_study_id }}"
                target="_blank">
-                Abrir visor
+                Abrir Orthanc
+            </a>
+
+            <a class="viewer-link viewer-link-secondary"
+               href="{{ orthanc_public_url or 'http://localhost:8042' }}/stone-webviewer/index.html?study={{ grupo.study_instance_uid }}"
+               target="_blank"
+               title="Preparado para Stone Web Viewer. En la imagen actual puede devolver 404 si el plugin/ruta no está activo.">
+                Stone viewer
             </a>
         {% else %}
             <p class="small">Estudio aún no vinculado a Orthanc</p>

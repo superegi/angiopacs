@@ -15,14 +15,17 @@ class Procedimiento(Base):
     paciente_sexo = Column(String(50), nullable=True)
     paciente_fecha_nacimiento = Column(Date, nullable=True)
     paciente_id = Column(String(100), index=True, nullable=True)
+    paciente_mail = Column(String(255), nullable=True)
+    paciente_telefono = Column(String(100), nullable=True)
     edad = Column(Integer, nullable=True)
 
     # Datos del procedimiento
     lugar = Column(String(255), nullable=True)
     institucion = Column(String(255), nullable=True)
     historia_clinica = Column(String(100), index=True, nullable=True)
-    fecha = Column(Date, nullable=True)
+    fecha = Column(Date, nullable=True)  # fecha manual del procedimiento/caso
     proxima_visita_agendada = Column(Date, nullable=True)
+    estado_caso = Column(String(50), index=True, default="abierto")
     procedimiento = Column(String(255), nullable=True)
     diagnostico = Column(Text, nullable=True)
 
@@ -122,7 +125,7 @@ class Archivo(Base):
     confianza_match = Column(Float, nullable=True)
     razon_match = Column(Text, nullable=True)
 
-    estado = Column(String(50), default="pendiente")
+    estado = Column(Text, default="pendiente")
     creado_en = Column(DateTime, default=datetime.utcnow)
 
 
@@ -210,7 +213,7 @@ class SugerenciaIA(Base):
     confianza = Column(Float, nullable=True)
     razon = Column(Text, nullable=True)
 
-    estado = Column(String(50), default="pendiente")
+    estado = Column(Text, default="pendiente")
     creado_en = Column(DateTime, default=datetime.utcnow)
     resuelto_en = Column(DateTime, nullable=True)
 

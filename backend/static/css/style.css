@@ -1022,3 +1022,154 @@ button:hover {
   border: 1px solid rgba(217,22,28,0.35);
 }
 
+
+
+/* =========================================================
+   ANGIO-014/016: estado de casos y repositorios colapsables
+   ========================================================= */
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 900;
+  border: 1px solid var(--border);
+  background: var(--card-soft);
+  white-space: nowrap;
+}
+
+.status-abierto {
+  background: var(--green-100);
+  color: var(--green-600);
+}
+
+.status-hospitalizado {
+  background: var(--amber-100);
+  color: var(--amber-600);
+}
+
+.status-pendiente_control {
+  background: var(--blue-100);
+  color: var(--blue-600);
+}
+
+.status-de_alta {
+  background: var(--cream-300);
+  color: var(--muted);
+}
+
+.repo-group {
+  padding: 0;
+  overflow: hidden;
+}
+
+.repo-summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 18px 22px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  font-weight: 900;
+  color: var(--text);
+}
+
+.repo-summary::-webkit-details-marker {
+  display: none;
+}
+
+.repo-summary::after {
+  content: "Abrir";
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.repo-group[open] .repo-summary::after {
+  content: "Cerrar";
+}
+
+.repo-group .repo-list {
+  padding: 0 22px 22px;
+}
+
+
+/* =========================================================
+   ANGIO-026/028: panel diagnóstico DICOM / Orthanc
+   ========================================================= */
+
+.dicom-debug-panel {
+  margin: 16px 0 22px;
+  padding: 18px;
+  border-radius: 18px;
+  background: rgba(255, 250, 240, 0.86);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+}
+
+.dicom-debug-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.dicom-debug-box {
+  background: var(--card);
+  border-radius: 16px;
+  padding: 14px;
+  border-top: 5px solid var(--blue-600);
+}
+
+.dicom-debug-box .number {
+  font-size: 28px;
+  font-weight: 900;
+}
+
+.dicom-debug-box .label {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.dicom-error-details {
+  margin-top: 16px;
+}
+
+.dicom-error-details summary {
+  cursor: pointer;
+  font-weight: 900;
+  margin-bottom: 10px;
+}
+
+.dicom-error-item {
+  background: var(--red-100);
+  border-left: 5px solid var(--red-600);
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 10px;
+}
+
+.dicom-error-item pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  background: rgba(255,255,255,0.7);
+  border-radius: 10px;
+  padding: 10px;
+}
+
+/* ANGIO-035: botones múltiples para DICOM */
+.dicom-viewer-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.viewer-link-secondary {
+  background: rgba(255, 250, 240, 0.92);
+  color: var(--text);
+  border: 1px solid var(--border);
+}

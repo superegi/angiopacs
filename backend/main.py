@@ -12,11 +12,13 @@ from sqlalchemy.orm import Session, selectinload
 from routers.webhook import router as webhook_router
 from routers.pacientes import router as pacientes_router
 from database import engine, get_db
+from db.migrations import aplicar_migraciones_seguras
 from models import Base, Procedimiento, ParticipanteProcedimiento
 
 from routers.usuarios import router as usuarios_router
 
 Base.metadata.create_all(bind=engine)
+aplicar_migraciones_seguras(engine)
 
 BASE_DIR = Path(__file__).resolve().parent
 
@@ -151,8 +153,55 @@ def construir_resumen_procedimiento(p: Procedimiento) -> dict:
         "operadores": operadores,
         "tiene_archivos": tiene_archivos,
         "tiene_dicom": tiene_dicom,
+        "estado_caso": p.estado_caso or "abierto",
     }
 
+
+
+@app.get("/casos-activos")
+def casos_activos(
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    auth = require_login(request)
+    if auth:
+        return auth
+
+    estados_visibles = ["abierto", "hospitalizado", "pendiente_control"]
+
+    procedimientos_db = (
+        db.query(Procedimiento)
+        .options(
+            selectinload(Procedimiento.participantes),
+            selectinload(Procedimiento.archivos),
+            selectinload(Procedimiento.estudios_dicom),
+        )
+        .filter(Procedimiento.estado_caso.in_(estados_visibles))
+        .order_by(Procedimiento.fecha.desc().nullslast(), Procedimiento.id.desc())
+        .all()
+    )
+
+    procedimientos = [construir_resumen_procedimiento(p) for p in procedimientos_db]
+
+    conteos = {
+        "abierto": 0,
+        "hospitalizado": 0,
+        "pendiente_control": 0,
+    }
+
+    for p in procedimientos:
+        estado = p.get("estado_caso") or "abierto"
+        if estado in conteos:
+            conteos[estado] += 1
+
+    return templates.TemplateResponse(
+        request=request,
+        name="casos_activos.html",
+        context={
+            "procedimientos": procedimientos,
+            "conteos": conteos,
+        }
+    )
 
 @app.get("/login")
 def login_get(request: Request):
@@ -201,6 +250,7 @@ def home(
     operador: str = "",
     lugar: str = "",
     buscar: str = "",
+    estado_caso: str = "",
     db: Session = Depends(get_db)
 ):
     auth = require_login(request)
@@ -215,6 +265,9 @@ def home(
             selectinload(Procedimiento.estudios_dicom),
         )
     )
+
+    if estado_caso:
+        query = query.filter(Procedimiento.estado_caso == estado_caso)
 
     if fecha_desde:
         query = query.filter(Procedimiento.fecha >= fecha_desde)
@@ -281,6 +334,7 @@ def home(
             "operador": operador,
             "lugar": lugar,
             "buscar": buscar,
+            "estado_caso": estado_caso,
         }
     )
 

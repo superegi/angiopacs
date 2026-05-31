@@ -19,6 +19,7 @@
 
     <div class="side-section">Principal</div>
     <a class="side-link" href="/">Procedimientos</a>
+    <a class="side-link" href="/casos-activos">Casos activos</a>
     <a class="side-link" href="/nuevo-caso">Nuevo caso</a>
     <a class="side-link" href="/usuarios">Usuarios</a>
 
@@ -59,8 +60,11 @@
 
 {% if agrupados %}
     {% for tipo, items in agrupados.items() %}
-    <div class="card">
-        <h2 class="card-title">{{ tipo }}</h2>
+    <details class="card repo-group">
+        <summary class="repo-summary">
+            <span>{{ tipo }}</span>
+            <span class="small">{{ items|length }} tags</span>
+        </summary>
 
         <div class="repo-list">
             {% for item in items %}
@@ -87,6 +91,16 @@
                         <button type="submit" class="btn-danger">Desactivar</button>
                     </form>
                     {% else %}
+                    <form method="post" action="/repositorios/{{ item.id }}/activar">
+                        <button type="submit">Activar</button>
+                    </form>
+                    {% endif %}
+                </div>
+            {% endfor %}
+        </div>
+    </details>
+    {% endfor %}
+{% else %}
                     <form method="post" action="/repositorios/{{ item.id }}/activar">
                         <button type="submit">Activar</button>
                     </form>

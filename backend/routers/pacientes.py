@@ -402,6 +402,9 @@ def nuevo_caso_post(
     paciente_sexo: str = Form(None),
     paciente_fecha_nacimiento: str = Form(None),
     paciente_id: str = Form(None),
+    paciente_mail: str = Form(None),
+    paciente_telefono: str = Form(None),
+    estado_caso: str = Form("abierto"),
     edad: str = Form(None),
     historia_clinica: str = Form(None),
     institucion: str = Form(None),
@@ -419,6 +422,9 @@ def nuevo_caso_post(
         paciente_sexo=paciente_sexo.strip() if paciente_sexo else None,
         paciente_fecha_nacimiento=parse_date_or_none(paciente_fecha_nacimiento),
         paciente_id=paciente_id.strip() if paciente_id else None,
+        paciente_mail=paciente_mail.strip() if paciente_mail else None,
+        paciente_telefono=paciente_telefono.strip() if paciente_telefono else None,
+        estado_caso=estado_caso.strip() if estado_caso else "abierto",
         edad=edad_int,
         historia_clinica=historia_clinica.strip() if historia_clinica else None,
         institucion=institucion.strip() if institucion else None,
@@ -714,6 +720,9 @@ async def editar_procedimiento(
     paciente_sexo: str = Form(None),
     paciente_fecha_nacimiento: str = Form(None),
     paciente_id: str = Form(None),
+    paciente_mail: str = Form(None),
+    paciente_telefono: str = Form(None),
+    estado_caso: str = Form("abierto"),
     fecha: str = Form(None),
     proxima_visita_agendada: str = Form(None),
     institucion: str = Form(None),
@@ -751,6 +760,9 @@ async def editar_procedimiento(
     p.paciente_sexo = paciente_sexo
     p.paciente_fecha_nacimiento = parse_date_or_none(paciente_fecha_nacimiento)
     p.paciente_id = paciente_id
+    p.paciente_mail = paciente_mail.strip() if paciente_mail else None
+    p.paciente_telefono = paciente_telefono.strip() if paciente_telefono else None
+    p.estado_caso = estado_caso.strip() if estado_caso else "abierto"
     p.fecha = parse_date_or_none(fecha)
     p.proxima_visita_agendada = parse_date_or_none(proxima_visita_agendada)
     p.institucion = institucion.strip() if institucion else None
@@ -789,7 +801,7 @@ async def editar_procedimiento(
     )
 
 
-@router.post("/procedimientos/{procedimiento_id}/subir-archivo")
+@router.post("/procedimientos/{procedimiento_id}/subir-archivo-legacy")
 async def subir_archivo_procedimiento(
     procedimiento_id: int,
     archivo: UploadFile = File(...),
@@ -852,7 +864,7 @@ async def subir_archivo_procedimiento(
             registrar_estudio_dicom_desde_archivo(db, nuevo, procedimiento_id, set())
 
         except Exception as e:
-            nuevo.estado = f"error_orthanc: {str(e)[:120]}"
+            nuevo.estado="error_orthanc"
 
     db.add(nuevo)
     db.commit()
@@ -910,7 +922,7 @@ async def subir_archivo_procedimiento(
                             registrar_estudio_dicom_desde_archivo(db, nuevo_extraido, procedimiento_id, dicom_study_uids_registrados)
 
                         except Exception as e:
-                            nuevo_extraido.estado = f"error_orthanc: {str(e)[:120]}"
+                            nuevo_extraido.estado="error_orthanc"
 
                     db.add(nuevo_extraido)
 
@@ -1064,6 +1076,9 @@ def exportar_procedimiento_zip(
             "paciente_sexo": getattr(procedimiento, "paciente_sexo", None),
             "paciente_fecha_nacimiento": str(procedimiento.paciente_fecha_nacimiento) if getattr(procedimiento, "paciente_fecha_nacimiento", None) else None,
             "paciente_id": getattr(procedimiento, "paciente_id", None),
+            "paciente_mail": getattr(procedimiento, "paciente_mail", None),
+            "paciente_telefono": getattr(procedimiento, "paciente_telefono", None),
+            "estado_caso": getattr(procedimiento, "estado_caso", None),
             "edad": procedimiento.edad,
             "historia_clinica": procedimiento.historia_clinica,
             "lugar": procedimiento.lugar,
@@ -1145,6 +1160,9 @@ def exportar_procedimiento_zip(
     md_lines.append("")
     md_lines.append(f"- Paciente: {procedimiento.paciente_nombre or ''} {getattr(procedimiento, 'paciente_apellido', '') or ''}")
     md_lines.append(f"- ID paciente: {getattr(procedimiento, 'paciente_id', '') or ''}")
+    md_lines.append(f"- Mail paciente: {getattr(procedimiento, 'paciente_mail', '') or ''}")
+    md_lines.append(f"- Teléfono paciente: {getattr(procedimiento, 'paciente_telefono', '') or ''}")
+    md_lines.append(f"- Estado caso: {getattr(procedimiento, 'estado_caso', '') or ''}")
     md_lines.append(f"- Historia clinica: {procedimiento.historia_clinica or ''}")
     md_lines.append(f"- Fecha: {procedimiento.fecha or ''}")
     md_lines.append(f"- Institucion: {getattr(procedimiento, 'institucion', '') or ''}")
@@ -1223,3 +1241,322 @@ def obtener_archivo(
         raise HTTPException(status_code=404, detail="Archivo físico no encontrado")
 
     return FileResponse(ruta)
+
+
+# ============================================================
+# ANGIO-024/025: upload robusto ZIP/DICOM + reintento Orthanc
+# ============================================================
+
+def _angio_nombre_seguro(nombre: str | None) -> str:
+    nombre = Path(nombre or "archivo").name
+    nombre = nombre.replace("/", "_").replace("\\", "_").strip()
+    return nombre or "archivo"
+
+
+def _angio_tipo_por_nombre(nombre: str | None) -> str:
+    ext = Path(nombre or "").suffix.lower()
+
+    if ext in [".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp"]:
+        return "foto"
+    if ext in [".mp4", ".mov", ".avi", ".mkv", ".webm"]:
+        return "video"
+    if ext == ".zip":
+        return "zip"
+    if ext in [".dcm", ".dicom", ".ima"]:
+        return "dicom"
+    if ext == ".pdf":
+        return "pdf"
+
+    return "archivo"
+
+
+def _angio_guardar_bytes(procedimiento_id: int, nombre_original: str, data: bytes, subcarpeta: str = "web") -> Path:
+    carpeta = Path(DATA_PATH) / subcarpeta / str(procedimiento_id)
+    carpeta.mkdir(parents=True, exist_ok=True)
+
+    destino = carpeta / f"{uuid.uuid4().hex}_{_angio_nombre_seguro(nombre_original)}"
+
+    with open(destino, "wb") as f:
+        f.write(data)
+
+    return destino
+
+
+def _angio_crear_archivo(
+    db: Session,
+    procedimiento_id: int,
+    ruta: Path,
+    nombre_original: str,
+    origen: str,
+    categoria: str | None = None,
+    caption: str | None = None,
+):
+    archivo = Archivo(
+        procedimiento_id=procedimiento_id,
+        tipo=_angio_tipo_por_nombre(nombre_original),
+        categoria=categoria,
+        caption=caption,
+        origen=origen,
+        ruta=str(ruta),
+        nombre_original=nombre_original,
+        estado="asociado",
+    )
+
+    db.add(archivo)
+    db.flush()
+    return archivo
+
+
+def _angio_intentar_orthanc(db: Session, archivo: Archivo, procedimiento_id: int):
+    """
+    Intenta subir un archivo a Orthanc.
+    Si falla, NO revienta el flujo completo.
+    Guarda error largo en razon_match, no en estado.
+    """
+    try:
+        resultado = subir_dicom_a_orthanc(archivo.ruta)
+
+        archivo.tipo = "dicom"
+        archivo.estado = "asociado"
+        archivo.razon_match = None
+        archivo.orthanc_instance_id = resultado.get("orthanc_instance_id")
+        archivo.orthanc_study_id = resultado.get("orthanc_study_id")
+        archivo.study_instance_uid = resultado.get("study_instance_uid")
+
+        estudio = registrar_estudio_dicom_desde_archivo(
+            db=db,
+            archivo=archivo,
+            procedimiento_id=procedimiento_id,
+        )
+
+        return estudio
+
+    except Exception as e:
+        archivo.tipo = "dicom"
+        archivo.estado = "error_orthanc"
+        archivo.razon_match = str(e)[:1500]
+        return None
+
+
+@router.post("/procedimientos/{procedimiento_id}/archivos/subir")
+@router.post("/procedimientos/{procedimiento_id}/subir-archivo")
+async def subir_archivo_procedimiento_robusto(
+    procedimiento_id: int,
+    request: Request,
+    archivos: list[UploadFile] = File(None),
+    archivo: UploadFile = File(None),
+    categoria: str = Form(None),
+    caption: str = Form(None),
+    db: Session = Depends(get_db),
+):
+    procedimiento = db.query(Procedimiento).filter(Procedimiento.id == procedimiento_id).first()
+
+    if not procedimiento:
+        raise HTTPException(status_code=404, detail="Procedimiento no encontrado")
+
+    recibidos = []
+
+    if archivos:
+        recibidos.extend([a for a in archivos if a is not None])
+
+    if archivo is not None:
+        recibidos.append(archivo)
+
+    if not recibidos:
+        return RedirectResponse(url=f"/procedimientos/{procedimiento_id}", status_code=303)
+
+    for upload in recibidos:
+        nombre = _angio_nombre_seguro(upload.filename)
+        data = await upload.read()
+
+        if not data:
+            continue
+
+        tipo = _angio_tipo_por_nombre(nombre)
+        ruta = _angio_guardar_bytes(procedimiento_id, nombre, data, subcarpeta="web")
+
+        archivo_db = _angio_crear_archivo(
+            db=db,
+            procedimiento_id=procedimiento_id,
+            ruta=ruta,
+            nombre_original=nombre,
+            origen="web",
+            categoria=categoria,
+            caption=caption,
+        )
+
+        # DICOM suelto
+        if tipo == "dicom":
+            _angio_intentar_orthanc(db, archivo_db, procedimiento_id)
+
+        # ZIP: guardar original + extraer contenido
+        if tipo == "zip":
+            archivo_db.estado = "zip_original"
+
+            carpeta_extraida = ruta.parent / f"zip_{archivo_db.id}"
+            carpeta_extraida.mkdir(parents=True, exist_ok=True)
+
+            try:
+                with zipfile.ZipFile(ruta, "r") as z:
+                    for member in z.infolist():
+                        if member.is_dir():
+                            continue
+
+                        member_name = _angio_nombre_seguro(member.filename)
+
+                        if not member_name or member_name.startswith("."):
+                            continue
+
+                        destino = carpeta_extraida / member_name
+
+                        with z.open(member) as src, open(destino, "wb") as dst:
+                            shutil.copyfileobj(src, dst)
+
+                        extraido_db = _angio_crear_archivo(
+                            db=db,
+                            procedimiento_id=procedimiento_id,
+                            ruta=destino,
+                            nombre_original=member_name,
+                            origen="zip",
+                            categoria=categoria,
+                            caption=caption,
+                        )
+
+                        if _angio_tipo_por_nombre(member_name) == "dicom":
+                            _angio_intentar_orthanc(db, extraido_db, procedimiento_id)
+
+            except zipfile.BadZipFile:
+                archivo_db.estado = "error_zip"
+                archivo_db.razon_match = "ZIP inválido o corrupto."
+
+        db.commit()
+
+    procedimiento.actualizado_en = datetime.utcnow()
+    db.commit()
+
+    return RedirectResponse(url=f"/procedimientos/{procedimiento_id}", status_code=303)
+
+
+@router.post("/procedimientos/{procedimiento_id}/dicom/reintentar-orthanc-legacy")
+def reintentar_orthanc_procedimiento(
+    procedimiento_id: int,
+    db: Session = Depends(get_db),
+):
+    procedimiento = db.query(Procedimiento).filter(Procedimiento.id == procedimiento_id).first()
+
+    if not procedimiento:
+        raise HTTPException(status_code=404, detail="Procedimiento no encontrado")
+
+    archivos_dicom = (
+        db.query(Archivo)
+        .filter(
+            Archivo.procedimiento_id == procedimiento_id,
+            Archivo.tipo == "dicom",
+        )
+        .order_by(Archivo.id.asc())
+        .all()
+    )
+
+    for archivo_db in archivos_dicom:
+        if archivo_db.study_instance_uid and archivo_db.orthanc_study_id:
+            continue
+
+        ruta = Path(archivo_db.ruta)
+
+        if not ruta.exists():
+            archivo_db.estado = "error_archivo_no_existe"
+            archivo_db.razon_match = "El archivo no existe en disco."
+            continue
+
+        _angio_intentar_orthanc(db, archivo_db, procedimiento_id)
+        db.commit()
+
+    procedimiento.actualizado_en = datetime.utcnow()
+    db.commit()
+
+    return RedirectResponse(url=f"/procedimientos/{procedimiento_id}", status_code=303)
+
+
+# ============================================================
+# ANGIO-026/028: reintento Orthanc ampliado y diagnóstico visible
+# ============================================================
+
+def _angio_026_es_dicom_archivo(archivo: Archivo) -> bool:
+    nombre = f"{archivo.nombre_original or ''} {archivo.ruta or ''}".lower()
+
+    if archivo.tipo == "dicom":
+        return True
+
+    if ".dcm" in nombre or ".ima" in nombre or ".dicom" in nombre:
+        return True
+
+    return False
+
+
+def _angio_026_intentar_orthanc(db: Session, archivo: Archivo, procedimiento_id: int):
+    try:
+        resultado = subir_dicom_a_orthanc(archivo.ruta)
+
+        archivo.tipo = "dicom"
+        archivo.estado = "asociado"
+        archivo.razon_match = None
+        archivo.orthanc_instance_id = resultado.get("orthanc_instance_id")
+        archivo.orthanc_study_id = resultado.get("orthanc_study_id")
+        archivo.study_instance_uid = resultado.get("study_instance_uid")
+
+        if archivo.study_instance_uid:
+            registrar_estudio_dicom_desde_archivo(
+                db=db,
+                archivo=archivo,
+                procedimiento_id=procedimiento_id,
+            )
+
+        return True
+
+    except Exception as e:
+        archivo.tipo = "dicom"
+        archivo.estado = "error_orthanc"
+        archivo.razon_match = str(e)[:1500]
+        return False
+
+
+@router.post("/procedimientos/{procedimiento_id}/dicom/reintentar-orthanc")
+def reintentar_orthanc_procedimiento_v2(
+    procedimiento_id: int,
+    db: Session = Depends(get_db),
+):
+    procedimiento = db.query(Procedimiento).filter(Procedimiento.id == procedimiento_id).first()
+
+    if not procedimiento:
+        raise HTTPException(status_code=404, detail="Procedimiento no encontrado")
+
+    archivos = (
+        db.query(Archivo)
+        .filter(Archivo.procedimiento_id == procedimiento_id)
+        .order_by(Archivo.id.asc())
+        .all()
+    )
+
+    candidatos = [a for a in archivos if _angio_026_es_dicom_archivo(a)]
+
+    for archivo_db in candidatos:
+        if archivo_db.study_instance_uid and archivo_db.orthanc_study_id:
+            continue
+
+        ruta = Path(archivo_db.ruta)
+
+        if not ruta.exists():
+            archivo_db.tipo = "dicom"
+            archivo_db.estado = "error_archivo_no_existe"
+            archivo_db.razon_match = f"No existe en disco: {archivo_db.ruta}"
+            db.commit()
+            continue
+
+        _angio_026_intentar_orthanc(db, archivo_db, procedimiento_id)
+        db.commit()
+
+    procedimiento.actualizado_en = datetime.utcnow()
+    db.commit()
+
+    return RedirectResponse(url=f"/procedimientos/{procedimiento_id}", status_code=303)
+

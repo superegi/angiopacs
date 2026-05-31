@@ -21,6 +21,7 @@
 
     <div class="side-section">Principal</div>
     <a class="side-link" href="/">Procedimientos</a>
+    <a class="side-link" href="/casos-activos">Casos activos</a>
     <a class="side-link" href="/nuevo-caso">Nuevo caso</a>
     <a class="side-link" href="/usuarios">Usuarios</a>
 
@@ -80,6 +81,17 @@
                         <input name="lugar" value="{{ lugar }}" placeholder="Ej: Oulton, hospital, clínica">
                     </div>
 
+                    <div>
+                        <label>Estado</label>
+                        <select name="estado_caso">
+                            <option value="" {% if not estado_caso %}selected{% endif %}>Todos</option>
+                            <option value="abierto" {% if estado_caso == "abierto" %}selected{% endif %}>Abierto</option>
+                            <option value="hospitalizado" {% if estado_caso == "hospitalizado" %}selected{% endif %}>Hospitalizado</option>
+                            <option value="pendiente_control" {% if estado_caso == "pendiente_control" %}selected{% endif %}>Pendiente control</option>
+                            <option value="de_alta" {% if estado_caso == "de_alta" %}selected{% endif %}>De alta</option>
+                        </select>
+                    </div>
+
                     <div class="filters-wide">
                         <label>Búsqueda general</label>
                         <input name="buscar" value="{{ buscar }}" placeholder="Paciente, diagnóstico, procedimiento, HC">
@@ -101,6 +113,7 @@
                             <tr>
                                 <th>N caso</th>
                                 <th>Fecha procedimiento</th>
+                                <th>Estado</th>
                                 <th>Paciente</th>
                                 <th>Hospital / clínica</th>
                                 <th>Operadores</th>
@@ -123,6 +136,12 @@
                                     {% else %}
                                         <span class="muted">Sin fecha</span>
                                     {% endif %}
+                                </td>
+
+                                <td>
+                                    <span class="status-pill status-{{ p.estado_caso or 'abierto' }}">
+                                        {{ p.estado_caso or "abierto" }}
+                                    </span>
                                 </td>
 
                                 <td>

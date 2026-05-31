@@ -1,7 +1,7 @@
 import os
 import requests
 
-ORTHANC_URL = os.getenv("ORTHANC_URL")
+ORTHANC_URL = os.getenv("ORTHANC_URL", "http://orthanc-pacs:8042")
 ORTHANC_USER = os.getenv("ORTHANC_USER")
 ORTHANC_PASSWORD = os.getenv("ORTHANC_PASSWORD")
 
@@ -12,7 +12,9 @@ ORTHANC_PUBLIC_URL = os.getenv(
 
 
 def auth():
-    return (ORTHANC_USER, ORTHANC_PASSWORD)
+    if ORTHANC_USER and ORTHANC_PASSWORD:
+        return (ORTHANC_USER, ORTHANC_PASSWORD)
+    return None
 
 
 def subir_dicom_a_orthanc(ruta_archivo: str):
@@ -60,16 +62,8 @@ def subir_dicom_a_orthanc(ruta_archivo: str):
 
 
 def url_study_explorer(study_id: str):
-
-    return (
-        f"{ORTHANC_PUBLIC_URL}"
-        f"/app/explorer.html#study?uuid={study_id}"
-    )
+    return f"{ORTHANC_PUBLIC_URL}/app/explorer.html#study?uuid={study_id}"
 
 
-def url_instance_preview(instance_id: str):
-
-    return (
-        f"{ORTHANC_PUBLIC_URL}"
-        f"/web-viewer/app/viewer.html?study={instance_id}"
-    )
+def url_instance_preview(study_instance_uid: str):
+    return f"{ORTHANC_PUBLIC_URL}/ui/app/#/filtered-studies?StudyInstanceUID={study_instance_uid}"
