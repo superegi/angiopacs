@@ -43,3 +43,9 @@ ANGIO_DIAG_*
 # Config local generada con secretos
 config/orthanc.json
 /ORTHANC
+
+# Entorno local / credenciales
+.env
+.env.*
+!.env.example
+*.credentials.txt
