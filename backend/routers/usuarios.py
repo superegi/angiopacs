@@ -8,6 +8,7 @@ from passlib.context import CryptContext
 
 from database import get_db
 from models import Usuario, AuditoriaEvento
+from services.audit_service import get_client_timezone, get_client_utc_offset_minutes
 
 router = APIRouter()
 
@@ -32,6 +33,8 @@ def registrar_evento_usuario(
             usuario=request.session.get("user"),
             ip=request.client.host if request.client else None,
             user_agent=request.headers.get("user-agent"),
+            client_timezone=get_client_timezone(request),
+            client_utc_offset_minutes=get_client_utc_offset_minutes(request),
             accion=accion,
             tarea=tarea,
             estado=estado,

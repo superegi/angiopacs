@@ -52,3 +52,23 @@
     {% endif %}
     <a class="side-link" href="/logout">Cerrar sesión</a>
 </aside>
+
+
+<!-- NeuroPACS: captura zona horaria del navegador para auditoria -->
+<script>
+(function () {
+    try {
+        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
+        const offset = String(new Date().getTimezoneOffset());
+
+        if (tz) {
+            document.cookie = "client_timezone=" + encodeURIComponent(tz) + "; path=/; SameSite=Lax";
+        }
+
+        document.cookie = "client_utc_offset_minutes=" + encodeURIComponent(offset) + "; path=/; SameSite=Lax";
+    } catch (e) {
+        // No bloquear la interfaz si el navegador no entrega timezone.
+    }
+})();
+</script>
+

@@ -17,6 +17,7 @@ from routers.pacientes import router as pacientes_router
 from database import engine, get_db
 from db.migrations import aplicar_migraciones_seguras
 from models import Base, Procedimiento, ParticipanteProcedimiento, Usuario, AuditoriaEvento
+from services.audit_service import get_client_timezone, get_client_utc_offset_minutes
 
 from routers.usuarios import router as usuarios_router
 from routers.orthanc_gateway import router as orthanc_gateway_router
@@ -71,6 +72,8 @@ def registrar_evento_seguridad(
             usuario=usuario or request.session.get("user"),
             ip=request.client.host if request.client else None,
             user_agent=request.headers.get("user-agent"),
+            client_timezone=get_client_timezone(request),
+            client_utc_offset_minutes=get_client_utc_offset_minutes(request),
             accion=accion,
             tarea=tarea,
             estado=estado,
