@@ -19,8 +19,8 @@ services:
     image: orthancteam/orthanc:latest
     container_name: angio_pacs
     ports:
-      - "127.0.0.1:${PORT_ORTHANC_DICOM}:4242"
-      - "127.0.0.1:${PORT_ORTHANC_WEB}:8042"
+      - "${ORTHANC_BIND_ADDRESS:-127.0.0.1}:${PORT_ORTHANC_WEB}:8042"
+      - "${ORTHANC_BIND_ADDRESS:-127.0.0.1}:${PORT_ORTHANC_DICOM}:4242"
     environment:
       ORTHANC__NAME: ${ORTHANC_NAME}
       ORTHANC__DICOM_AET: ${ORTHANC_AETITLE}
