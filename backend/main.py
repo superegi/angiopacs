@@ -9,7 +9,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
-from sqlalchemy import or_
+from sqlalchemy import or_, func
 from sqlalchemy.orm import Session, selectinload
 
 from routers.webhook import router as webhook_router
@@ -413,6 +413,8 @@ def home(
     lugar: str = "",
     buscar: str = "",
     estado_caso: str = "",
+    ordenar: str = "id",
+    direccion: str = "desc",
     db: Session = Depends(get_db)
 ):
     auth = require_login(request)
@@ -480,11 +482,51 @@ def home(
             )
         )
 
-    procedimientos_db = query.order_by(Procedimiento.id.desc()).all()
+    direccion = (direccion or "desc").lower()
+    if direccion not in ["asc", "desc"]:
+        direccion = "desc"
+
+    ordenar = (ordenar or "id").lower()
+    if ordenar not in ["id", "fecha", "paciente"]:
+        ordenar = "id"
+
+    if ordenar == "fecha":
+        columna_orden = Procedimiento.fecha
+    elif ordenar == "paciente":
+        columna_orden = func.lower(
+            func.concat(
+                func.coalesce(Procedimiento.paciente_apellido, ""),
+                " ",
+                func.coalesce(Procedimiento.paciente_nombre, ""),
+            )
+        )
+    else:
+        columna_orden = Procedimiento.id
+
+    if direccion == "asc":
+        query = query.order_by(columna_orden.asc().nullslast(), Procedimiento.id.asc())
+    else:
+        query = query.order_by(columna_orden.desc().nullslast(), Procedimiento.id.desc())
+
+    procedimientos_db = query.all()
     procedimientos = [
         construir_resumen_procedimiento(p)
         for p in procedimientos_db
     ]
+
+    filtros_activos = {
+        "fecha_desde": fecha_desde,
+        "fecha_hasta": fecha_hasta,
+        "operador": operador,
+        "lugar": lugar,
+        "buscar": buscar,
+        "estado_caso": estado_caso,
+    }
+
+    filtros_activos = {
+        k: v for k, v in filtros_activos.items()
+        if v not in [None, ""]
+    }
 
     return templates.TemplateResponse(
         request=request,
@@ -497,6 +539,9 @@ def home(
             "lugar": lugar,
             "buscar": buscar,
             "estado_caso": estado_caso,
+            "ordenar": ordenar,
+            "direccion": direccion,
+            "filtros_activos": filtros_activos,
         }
     )
 

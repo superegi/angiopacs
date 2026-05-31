@@ -35,6 +35,8 @@
                 <h2 class="card-title">Filtros</h2>
 
                 <form method="get" action="/" class="filters-grid">
+                <input type="hidden" name="ordenar" value="{{ ordenar or 'id' }}">
+                <input type="hidden" name="direccion" value="{{ direccion or 'desc' }}">
                     <div>
                         <label>Desde</label>
                         <input type="date" name="fecha_desde" value="{{ fecha_desde }}">
@@ -76,19 +78,69 @@
                         <a class="btn btn-secondary" href="/">Limpiar</a>
                     </div>
                 </form>
+
+            {% if filtros_activos %}
+            <div class="active-filters-bar">
+                <strong>Filtros activos:</strong>
+
+                {% if fecha_desde %}
+                    <span class="filter-chip">Desde: {{ fecha_desde }}</span>
+                {% endif %}
+
+                {% if fecha_hasta %}
+                    <span class="filter-chip">Hasta: {{ fecha_hasta }}</span>
+                {% endif %}
+
+                {% if operador %}
+                    <span class="filter-chip">Operador: {{ operador }}</span>
+                {% endif %}
+
+                {% if lugar %}
+                    <span class="filter-chip">Lugar: {{ lugar }}</span>
+                {% endif %}
+
+                {% if buscar %}
+                    <span class="filter-chip">Buscar: {{ buscar }}</span>
+                {% endif %}
+
+                {% if estado_caso %}
+                    <span class="filter-chip">Estado: {{ estado_caso }}</span>
+                {% endif %}
+
+                <a class="btn btn-secondary btn-small" href="/">Limpiar filtros</a>
+            </div>
+            {% endif %}
             </section>
 
             <section class="card">
                 <h2 class="card-title">Listado de casos</h2>
 
                 <div class="table-wrap">
-                    <table class="table clinical-table">
+                    {% set sort_query_base = "fecha_desde=" ~ fecha_desde ~ "&fecha_hasta=" ~ fecha_hasta ~ "&operador=" ~ operador ~ "&lugar=" ~ lugar ~ "&buscar=" ~ buscar ~ "&estado_caso=" ~ estado_caso %}
+{% set next_dir_fecha = "asc" if ordenar != "fecha" or direccion == "desc" else "desc" %}
+{% set next_dir_paciente = "asc" if ordenar != "paciente" or direccion == "desc" else "desc" %}
+
+<table class="table clinical-table">
                         <thead>
                             <tr>
                                 <th>N caso</th>
-                                <th>Fecha procedimiento</th>
+                                <th>
+                    <a class="table-sort-link {% if ordenar == 'fecha' %}active{% endif %}" href="/?{{ sort_query_base }}&ordenar=fecha&direccion={{ next_dir_fecha }}">
+                        Fecha procedimiento
+                        {% if ordenar == 'fecha' %}
+                            {% if direccion == 'asc' %}↑{% else %}↓{% endif %}
+                        {% endif %}
+                    </a>
+                </th>
                                 <th>Estado</th>
-                                <th>Paciente</th>
+                                <th>
+                    <a class="table-sort-link {% if ordenar == 'paciente' %}active{% endif %}" href="/?{{ sort_query_base }}&ordenar=paciente&direccion={{ next_dir_paciente }}">
+                        Paciente
+                        {% if ordenar == 'paciente' %}
+                            {% if direccion == 'asc' %}↑{% else %}↓{% endif %}
+                        {% endif %}
+                    </a>
+                </th>
                                 <th>Hospital / clínica</th>
                                 <th>Operadores</th>
                                 <th>Procedimiento</th>
