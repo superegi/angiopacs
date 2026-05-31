@@ -1,4 +1,9 @@
-<aside class="sidebar">
+
+<aside class="sidebar" id="sidebarMenu">
+    <!-- ANGIO-MOBILE-SIDEBAR-INTERNAL-V5 -->
+    <button type="button" class="mobile-menu-toggle" id="mobileMenuToggle">
+        ☰ NeuroPACS
+    </button>
     <div class="side-brand">
         <img src="/static/img/logo-neuropacs.png" alt="NeuroPACS" class="side-brand-logo">
         <div class="side-brand-text">
@@ -72,3 +77,16 @@
 })();
 </script>
 
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const button = document.getElementById("mobileMenuToggle");
+    const sidebar = document.getElementById("sidebarMenu");
+
+    if (!button || !sidebar) return;
+
+    button.addEventListener("click", function () {
+        sidebar.classList.toggle("mobile-open");
+    });
+});
+</script>

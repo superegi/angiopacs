@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
-<body>
+<body class="procedimientos-compact-ready">
 
 <div class="app-shell">
 
@@ -120,7 +120,7 @@
 {% set next_dir_fecha = "asc" if ordenar != "fecha" or direccion == "desc" else "desc" %}
 {% set next_dir_paciente = "asc" if ordenar != "paciente" or direccion == "desc" else "desc" %}
 
-<table class="table clinical-table">
+<table class="table clinical-table procedimientos-table">
                         <thead>
                             <tr>
                                 <th>N caso</th>
@@ -280,6 +280,26 @@ document.addEventListener("DOMContentLoaded", function () {
 
         event.preventDefault();
         event.returnValue = "";
+    });
+});
+</script>
+
+
+<!-- NeuroPACS: etiquetas moviles tabla procedimientos -->
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    document.querySelectorAll("table.procedimientos-table").forEach(function (table) {
+        const headers = Array.from(table.querySelectorAll("thead th")).map(function (th) {
+            return (th.textContent || "").trim().replace(/\s+/g, " ");
+        });
+
+        table.querySelectorAll("tbody tr").forEach(function (row) {
+            Array.from(row.children).forEach(function (cell, index) {
+                if (headers[index]) {
+                    cell.setAttribute("data-label", headers[index]);
+                }
+            });
+        });
     });
 });
 </script>

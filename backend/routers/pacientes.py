@@ -10,7 +10,7 @@ import zipfile
 import json
 import unicodedata
 from urllib.parse import unquote
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timezone
 from zoneinfo import ZoneInfo
 from services.orthanc_service import subir_dicom_a_orthanc
 from services.audit_service import start_task, finish_task, log_upload_file, log_zip_summary, log_global, log_case, log_case, log_global
@@ -23,6 +23,41 @@ from models import Procedimiento, Archivo, ParticipanteProcedimiento, MaterialPr
 ORTHANC_PUBLIC_URL = os.getenv("ORTHANC_PUBLIC_URL", "http://localhost:8042")
 
 router = APIRouter()
+
+# ANGIO-FIX-HORA-LOCAL-V1
+def formatear_fecha_local(dt, tz_name: str | None = None) -> str:
+    """
+    Convierte timestamps naive guardados como UTC a hora local visible.
+
+    Regla:
+    - Si dt no tiene tzinfo, se interpreta como UTC.
+    - Si viene client_timezone, se usa.
+    - Si no, se usa TZ del servidor.
+    - Fallback: America/Santiago.
+    """
+    if not dt:
+        return ""
+
+    tz_name = (tz_name or os.getenv("TZ") or "America/Santiago").strip() or "America/Santiago"
+
+    try:
+        zona = ZoneInfo(tz_name)
+    except Exception:
+        zona = ZoneInfo("America/Santiago")
+
+    try:
+        if dt.tzinfo is None:
+            dt_utc = dt.replace(tzinfo=timezone.utc)
+        else:
+            dt_utc = dt.astimezone(timezone.utc)
+
+        return dt_utc.astimezone(zona).strftime("%Y-%m-%d %H:%M")
+    except Exception:
+        try:
+            return dt.strftime("%Y-%m-%d %H:%M")
+        except Exception:
+            return str(dt)
+
 templates = Jinja2Templates(directory="templates")
 
 DATA_PATH = os.getenv("DATA_PATH", "/app/data")
