@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Importar caso - NeuroPACS</title>
+<link rel="stylesheet" href="/static/css/style.css">
+</head>
+
+<body>
+<div class="app-shell">
+{% include "_sidebar.html" %}
+
+<div class="main-panel">
+<header class="topbar">
+    <div class="brand">
+        <h1>Importar caso</h1>
+        <span>ZIP exportado por NeuroPACS</span>
+    </div>
+</header>
+
+<main class="container">
+
+<a class="btn btn-secondary" href="/">Volver</a>
+
+<div class="card">
+    <h1>Importar caso desde ZIP</h1>
+    <p class="small">
+        Esta función importa un ZIP generado por NeuroPACS.
+        Reconstruye el caso, participantes, materiales, archivos livianos y referencias DICOM.
+    </p>
+
+    <form method="post" action="/importar-caso" enctype="multipart/form-data">
+        <label>Archivo ZIP NeuroPACS</label>
+        <input type="file" name="archivo" accept=".zip" required>
+
+        <button type="submit">Importar caso</button>
+    </form>
+</div>
+
+<div class="card">
+    <h2 class="card-title">Notas</h2>
+    <p class="small">
+        Los DICOM pesados no se duplican en el ZIP principal. Si el caso exportado tenía estudios DICOM,
+        se importarán como referencias por StudyInstanceUID / Orthanc ID.
+    </p>
+</div>
+
+</main>
+</div>
+</div>
+</body>
+</html>

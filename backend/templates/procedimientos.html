@@ -10,33 +10,7 @@
 
 <div class="app-shell">
 
-    <aside class="sidebar">
-    <div class="side-brand">
-        <img src="/static/img/logo-neuropacs.png" alt="NeuroPACS" class="side-brand-logo">
-        <div class="side-brand-text">
-            <h1>NeuroPACS</h1>
-            <p>Neurointervención · Registro clínico</p>
-        </div>
-    </div>
-
-    <div class="side-section">Principal</div>
-    <a class="side-link" href="/">Procedimientos</a>
-    <a class="side-link" href="/casos-activos">Casos activos</a>
-    <a class="side-link" href="/nuevo-caso">Nuevo caso</a>
-    <a class="side-link" href="/usuarios">Usuarios</a>
-
-    <div class="side-section">Gestión</div>
-    <a class="side-link" href="/repositorios">Repositorios / tags</a>
-    <a class="side-link" href="/auditoria">Auditoría</a>
-
-    <div class="side-section">Análisis</div>
-    <a class="side-link" href="/repositorios">Operadores</a>
-    <a class="side-link" href="/repositorios">Materiales</a>
-    <a class="side-link" href="#">Estadísticas</a>
-
-    <div class="side-section">Usuario</div>
-    <a class="side-link" href="/logout">Cerrar sesión</a>
-</aside>
+    {% include "_sidebar.html" %}
 
     <section class="main-panel">
         <header class="topbar">
@@ -48,7 +22,7 @@
 </header>
 
         <main class="container">
-<a class="btn" href="/nuevo-caso">Nuevo caso</a>
+<a class="btn" href="/nuevo-caso">Nuevo caso</a> <a class="btn btn-secondary" href="/importar-caso">Importar caso</a>
 
             <section class="summary">
                 <div class="metric">
@@ -120,7 +94,7 @@
                                 <th>Procedimiento</th>
                                 <th>Diagnóstico</th>
                                 <th>Fotos</th>
-                                <th>Imágenes</th>
+                                
                             </tr>
                         </thead>
                         <tbody>
@@ -192,24 +166,12 @@
 
                                 <td>
                                     {% if p.tiene_archivos %}
-                                        <a class="badge badge-img" href="/procedimientos/{{ p.id }}">
+                                        <a class="badge badge-img" href="/procedimientos/{{ p.id }}/galeria">
                                             Ver archivos
                                         </a>
                                     {% else %}
                                         <a class="badge" href="/procedimientos/{{ p.id }}">
                                             Agregar archivos
-                                        </a>
-                                    {% endif %}
-                                </td>
-
-                                <td>
-                                    {% if p.tiene_dicom %}
-                                        <a class="badge badge-img" href="/procedimientos/{{ p.id }}">
-                                            Explorador DICOM
-                                        </a>
-                                    {% else %}
-                                        <a class="badge" href="/procedimientos/{{ p.id }}">
-                                            Asociar DICOM
                                         </a>
                                     {% endif %}
                                 </td>

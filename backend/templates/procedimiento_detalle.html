@@ -8,33 +8,7 @@
 
 <body>
 <div class="app-shell">
-<aside class="sidebar">
-    <div class="side-brand">
-        <img src="/static/img/logo-neuropacs.png" alt="NeuroPACS" class="side-brand-logo">
-        <div class="side-brand-text">
-            <h1>NeuroPACS</h1>
-            <p>Neurointervención · Registro clínico</p>
-        </div>
-    </div>
-
-    <div class="side-section">Principal</div>
-    <a class="side-link" href="/">Procedimientos</a>
-    <a class="side-link" href="/casos-activos">Casos activos</a>
-    <a class="side-link" href="/nuevo-caso">Nuevo caso</a>
-    <a class="side-link" href="/usuarios">Usuarios</a>
-
-    <div class="side-section">Gestión</div>
-    <a class="side-link" href="/repositorios">Repositorios / tags</a>
-    <a class="side-link" href="/auditoria">Auditoría</a>
-
-    <div class="side-section">Análisis</div>
-    <a class="side-link" href="/repositorios">Operadores</a>
-    <a class="side-link" href="/repositorios">Materiales</a>
-    <a class="side-link" href="#">Estadísticas</a>
-
-    <div class="side-section">Usuario</div>
-    <a class="side-link" href="/logout">Cerrar sesión</a>
-</aside>
+{% include "_sidebar.html" %}
 
 <div class="main-panel">
 
@@ -49,7 +23,139 @@
 
 <main class="container">
 
-<a class="btn btn-secondary" href="/">← Volver</a><a class="btn" href="/procedimientos/{{ procedimiento.id }}/exportar">Exportar ZIP</a>
+<div class="case-actions">
+    <a class="btn btn-secondary" href="/">← Volver</a>
+    <button type="button" class="btn" id="angio-open-copy-dialog">Copiar datos</button>
+    <a class="btn" href="/procedimientos/{{ procedimiento.id }}/exportar-completo">Exportar completo</a>
+    <a class="btn btn-secondary" href="/procedimientos/{{ procedimiento.id }}/exportar">Exportar sin DICOM</a>
+</div>
+
+{% set datos = namespace(op1="", op2="", fellow="") %}
+{% for participante in participantes %}
+    {% set rol_norm = (participante.rol or "")|lower|replace(" ", "_")|replace("-", "_") %}
+    {% if rol_norm == "primer_operador" %}
+        {% set datos.op1 = participante.nombre %}
+    {% elif rol_norm == "segundo_operador" %}
+        {% set datos.op2 = participante.nombre %}
+    {% elif rol_norm == "fellow" %}
+        {% set datos.fellow = participante.nombre %}
+    {% endif %}
+{% endfor %}
+
+<dialog id="angio-copy-dialog" class="angio-copy-dialog">
+    <form method="dialog" class="angio-copy-dialog-card">
+        <div class="angio-dialog-header">
+            <h2>Copiar datos para WhatsApp</h2>
+            <button type="submit" class="angio-dialog-close" aria-label="Cerrar">×</button>
+        </div>
+
+<textarea id="angio-copy-textarea" rows="22" readonly>Lugar del procedimiento: {{ procedimiento.institucion or procedimiento.lugar or "" }}
+Historia Clínica: {{ procedimiento.historia_clinica or "" }}
+O social:
+Nombre del Paciente: {{ ((procedimiento.paciente_apellido or "") ~ " " ~ (procedimiento.paciente_nombre or ""))|trim }}
+Edad: {{ procedimiento.edad or "" }}
+Fecha: {{ procedimiento.fecha or "" }}
+1er Operador: {{ datos.op1 or procedimiento.primer_operador or "" }}
+2do operador: {{ datos.op2 or procedimiento.segundo_operador or "" }}
+Fellow: {{ datos.fellow or procedimiento.fellow or "" }}
+Localización: {{ procedimiento.localizacion_aneurisma or "" }}
+Vaina: {{ procedimiento.vaina or "" }}
+Micro catéter: {{ procedimiento.microcateter or "" }}
+Guía: {{ procedimiento.guia or procedimiento.microguia or "" }}
+Agente embólico / dispositivo: {{ procedimiento.fd or procedimiento.dispositivo or "" }}
+Materiales: {% if materiales %}{% for material in materiales %}{{ material.nombre }}{% if material.tipo_material %} ({{ material.tipo_material }}){% endif %}{% if material.cantidad %} x{{ material.cantidad }}{% endif %}{% if not loop.last %}; {% endif %}{% endfor %}{% else %}{{ procedimiento.materiales_usados or "" }}{% endif %}
+Presentación clínica: {{ procedimiento.presentacion_clinica or "" }}
+Complicaciones: {% if procedimiento.complicaciones_si_no %}{{ procedimiento.complicaciones_si_no }}{% elif procedimiento.complicaciones %}{{ procedimiento.complicaciones }}{% else %}No{% endif %}</textarea>
+
+        <div class="angio-dialog-actions">
+            <button type="button" class="btn" id="angio-copy-btn">Copiar contenido</button>
+            <button type="submit" class="btn btn-secondary">Cerrar</button>
+        </div>
+
+        <div id="angio-copy-status" class="small"></div>
+    </form>
+</dialog>
+
+<script>
+(function () {
+    function cleanText() {
+        const ta = document.getElementById("angio-copy-textarea");
+        if (!ta) return "";
+
+        ta.value = ta.value
+            .split("\\n")
+            .map(function (line) { return line.trimEnd(); })
+            .join("\\n")
+            .trim();
+
+        return ta.value;
+    }
+
+    function selectText() {
+        const ta = document.getElementById("angio-copy-textarea");
+        if (!ta) return;
+        ta.focus();
+        ta.select();
+    }
+
+    document.addEventListener("DOMContentLoaded", function () {
+        const dialog = document.getElementById("angio-copy-dialog");
+        const openBtn = document.getElementById("angio-open-copy-dialog");
+        const copyBtn = document.getElementById("angio-copy-btn");
+        const status = document.getElementById("angio-copy-status");
+
+        if (openBtn && dialog) {
+            openBtn.addEventListener("click", function () {
+                cleanText();
+
+                if (typeof dialog.showModal === "function") {
+                    dialog.showModal();
+                } else {
+                    dialog.setAttribute("open", "open");
+                }
+
+                setTimeout(selectText, 80);
+            });
+        }
+
+        if (dialog) {
+            dialog.addEventListener("click", function (event) {
+                const rect = dialog.getBoundingClientRect();
+                const clickedOutside =
+                    event.clientX < rect.left ||
+                    event.clientX > rect.right ||
+                    event.clientY < rect.top ||
+                    event.clientY > rect.bottom;
+
+                if (clickedOutside) {
+                    dialog.close();
+                }
+            });
+        }
+
+        if (copyBtn) {
+            copyBtn.addEventListener("click", async function () {
+                const text = cleanText();
+                selectText();
+
+                try {
+                    await navigator.clipboard.writeText(text);
+                    if (status) status.textContent = "Copiado al portapapeles.";
+                    return;
+                } catch (e) {}
+
+                try {
+                    const ok = document.execCommand("copy");
+                    if (status) status.textContent = ok ? "Copiado al portapapeles." : "Texto seleccionado. Usa Ctrl+C.";
+                } catch (e) {
+                    if (status) status.textContent = "Texto seleccionado. Usa Ctrl+C.";
+                }
+            });
+        }
+    });
+})();
+</script>
+
 
 <div class="card case-summary-card">
     <h1>{{ (procedimiento.paciente_nombre or "Sin nombre") }} {{ procedimiento.paciente_apellido or "" }}</h1>
@@ -429,12 +535,23 @@
 </div>
 
 <div class="card">
-    <h2 class="card-title">Subir archivo a este caso</h2>
+    <h2 class="card-title">Subir archivos a este caso</h2>
+    <p class="small">
+        Puedes seleccionar múltiples archivos o arrastrarlos aquí. Soporta ZIP, DICOM, IMA, imágenes, videos y PDF.
+    </p>
 
-    <form method="post" action="/procedimientos/{{ procedimiento.id }}/archivos/subir" enctype="multipart/form-data">
+    <form id="upload-form" method="post" action="/procedimientos/{{ procedimiento.id }}/archivos/subir" enctype="multipart/form-data">
         <label>Archivos</label>
-        <input type="file" name="archivos" multiple required>
-        <div class="small">Puedes seleccionar múltiples archivos, incluyendo ZIP, DICOM, imágenes, videos o PDF.</div>
+
+        <div id="upload-zone" class="upload-zone">
+            <input id="upload-input" type="file" name="archivos" multiple required>
+            <div class="upload-zone-title">Arrastra archivos aquí</div>
+            <div class="small">o haz clic para seleccionarlos desde el computador</div>
+        </div>
+
+        <div id="upload-file-list" class="upload-file-list small">
+            Sin archivos seleccionados.
+        </div>
 
         <label>Categoría</label>
         <input name="categoria" list="categorias_archivo" placeholder="Ej: estudio_previo">
@@ -442,9 +559,60 @@
         <label>Caption</label>
         <textarea name="caption" placeholder="Ej: AngioTC previa, control post procedimiento, foto del material usado"></textarea>
 
-        <button type="submit">Subir archivo</button>
+        <button type="submit">Subir archivos</button>
     </form>
 </div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const zone = document.getElementById("upload-zone");
+    const input = document.getElementById("upload-input");
+    const list = document.getElementById("upload-file-list");
+
+    if (!zone || !input || !list) return;
+
+    function renderFiles(files) {
+        if (!files || files.length === 0) {
+            list.textContent = "Sin archivos seleccionados.";
+            return;
+        }
+
+        const names = Array.from(files).map(function (f) {
+            const mb = f.size ? (f.size / 1024 / 1024).toFixed(1) + " MB" : "";
+            return "• " + f.name + (mb ? " (" + mb + ")" : "");
+        });
+
+        list.textContent = files.length + " archivo(s) seleccionado(s):\n" + names.join("\n");
+    }
+
+    zone.addEventListener("click", function () {
+        input.click();
+    });
+
+    input.addEventListener("change", function () {
+        renderFiles(input.files);
+    });
+
+    zone.addEventListener("dragover", function (event) {
+        event.preventDefault();
+        zone.classList.add("dragover");
+    });
+
+    zone.addEventListener("dragleave", function () {
+        zone.classList.remove("dragover");
+    });
+
+    zone.addEventListener("drop", function (event) {
+        event.preventDefault();
+        zone.classList.remove("dragover");
+
+        if (event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files.length > 0) {
+            input.files = event.dataTransfer.files;
+            renderFiles(input.files);
+        }
+    });
+});
+</script>
 
 <h2 style="color:#f7f3e8;">Estudios DICOM</h2>
 <form method="post" action="/procedimientos/{{ procedimiento.id }}/dicom/reintentar-orthanc" style="margin-bottom: 16px;">
@@ -529,7 +697,7 @@
                 Abrir Orthanc
             </a>
 
-            <a class="viewer-link viewer-link-secondary"
+            <a class="btn btn-secondary"
                href="{{ orthanc_public_url or 'http://localhost:8042' }}/stone-webviewer/index.html?study={{ grupo.study_instance_uid }}"
                target="_blank"
                title="Preparado para Stone Web Viewer. En la imagen actual puede devolver 404 si el plugin/ruta no está activo.">

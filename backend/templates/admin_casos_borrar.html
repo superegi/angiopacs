@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Eliminar casos - NeuroPACS</title>
+<link rel="stylesheet" href="/static/css/style.css">
+</head>
+
+<body>
+<div class="app-shell">
+{% include "_sidebar.html" %}
+
+<div class="main-panel">
+<header class="topbar">
+    <div class="brand">
+        <h1>Eliminar casos</h1>
+        <span>Repositorio administrativo de borrado</span>
+    </div>
+</header>
+
+<main class="container">
+
+<div class="card danger-card">
+    <h2>Zona administrativa</h2>
+    <p class="small">
+        Esta pantalla borra el caso, sus archivos registrados, participantes, materiales, estudios DICOM vinculados en la base de datos y sugerencias IA.
+        No elimina estudios directamente desde Orthanc todavía.
+    </p>
+</div>
+
+<div class="card">
+    <form method="get" action="/admin/casos-borrar" class="filters">
+        <label>Buscar caso</label>
+        <input name="buscar" value="{{ buscar or '' }}" placeholder="Nombre, apellido, HC, institución, procedimiento">
+        <button type="submit">Buscar</button>
+        <a class="btn btn-secondary" href="/admin/casos-borrar">Limpiar</a>
+    </form>
+</div>
+
+<div class="card">
+    <h2 class="card-title">Casos disponibles para borrar</h2>
+
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Paciente</th>
+                <th>HC</th>
+                <th>Fecha</th>
+                <th>Institución</th>
+                <th>Vínculos</th>
+                <th>Borrar</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for fila in filas %}
+            {% set p = fila.p %}
+            <tr>
+                <td>{{ p.id }}</td>
+                <td>
+                    <a href="/procedimientos/{{ p.id }}">
+                        {{ p.paciente_apellido or "" }} {{ p.paciente_nombre or "Sin nombre" }}
+                    </a>
+                </td>
+                <td>{{ p.historia_clinica or "—" }}</td>
+                <td>{{ p.fecha or "—" }}</td>
+                <td>{{ p.institucion or p.lugar or "—" }}</td>
+                <td class="small">
+                    Archivos: {{ fila.archivos_count }}<br>
+                    DICOM DB: {{ fila.dicom_count }}<br>
+                    Participantes: {{ fila.participantes_count }}<br>
+                    Materiales: {{ fila.materiales_count }}
+                </td>
+                <td>
+                    <details class="delete-details">
+                        <summary class="btn btn-danger">Borrar</summary>
+
+                        <form method="post" action="/admin/casos-borrar/{{ p.id }}" class="delete-form">
+                            <p class="small">
+                                Para confirmar, escribe <b>BORRAR</b>.
+                            </p>
+
+                            <input name="confirmar" placeholder="BORRAR" required>
+
+                            <label class="inline-check">
+                                <input type="checkbox" name="borrar_archivos" value="si" checked>
+                                Borrar archivos físicos asociados
+                            </label>
+
+                            <button type="submit" class="btn btn-danger">
+                                Confirmar borrado definitivo
+                            </button>
+                        </form>
+                    </details>
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+
+    {% if not filas %}
+        <p class="small">No hay casos para mostrar.</p>
+    {% endif %}
+</div>
+
+</main>
+</div>
+</div>
+</body>
+</html>

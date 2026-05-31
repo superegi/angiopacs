@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Galería caso {{ procedimiento.id }} - NeuroPACS</title>
+<link rel="stylesheet" href="/static/css/style.css">
+</head>
+
+<body>
+<div class="app-shell">
+{% include "_sidebar.html" %}
+
+<div class="main-panel">
+<header class="topbar">
+    <div class="brand">
+        <h1>Galería</h1>
+        <span>Caso {{ procedimiento.id }} · {{ procedimiento.paciente_apellido or "" }} {{ procedimiento.paciente_nombre or "" }}</span>
+    </div>
+</header>
+
+<main class="container">
+
+<div class="case-actions">
+    <a class="btn btn-secondary" href="/">← Listado</a>
+    <a class="btn" href="/procedimientos/{{ procedimiento.id }}">Abrir caso</a>
+</div>
+
+<div class="card">
+    <h2 class="card-title">Imágenes y videos</h2>
+    <p class="small">
+        Galería de archivos visuales asociados al caso. Los estudios DICOM se revisan desde el visor DICOM del caso.
+    </p>
+</div>
+
+{% if archivos %}
+<div class="gallery-grid">
+    {% for archivo in archivos %}
+    <div class="gallery-item card">
+        {% if archivo.tipo == "foto" %}
+            <a href="/archivos/{{ archivo.id }}" target="_blank">
+                <img src="/archivos/{{ archivo.id }}" alt="{{ archivo.nombre_original or 'imagen' }}">
+            </a>
+        {% elif archivo.tipo == "video" %}
+            <video controls preload="metadata">
+                <source src="/archivos/{{ archivo.id }}">
+            </video>
+        {% endif %}
+
+        <div class="small gallery-caption">
+            <b>{{ archivo.nombre_original or "Archivo" }}</b><br>
+            {% if archivo.categoria %}Categoría: {{ archivo.categoria }}<br>{% endif %}
+            {% if archivo.caption %}{{ archivo.caption }}{% endif %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="card">
+    <h2 class="card-title">Sin imágenes ni videos</h2>
+    <p class="small">Este caso aún no tiene archivos visuales asociados.</p>
+    <a class="btn" href="/procedimientos/{{ procedimiento.id }}">Subir archivos</a>
+</div>
+{% endif %}
+
+</main>
+</div>
+</div>
+</body>
+</html>

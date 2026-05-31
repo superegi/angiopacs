@@ -10,28 +10,7 @@
 
 <div class="app-shell">
 
-<aside class="sidebar">
-    <div class="side-brand">
-        <img src="/static/img/logo-neuropacs.png" alt="NeuroPACS" class="side-brand-logo">
-        <div class="side-brand-text">
-            <h1>NeuroPACS</h1>
-            <p>Neurointervención · Registro clínico</p>
-        </div>
-    </div>
-
-    <div class="side-section">Principal</div>
-    <a class="side-link" href="/">Procedimientos</a>
-    <a class="side-link active" href="/casos-activos">Casos activos</a>
-    <a class="side-link" href="/nuevo-caso">Nuevo caso</a>
-    <a class="side-link" href="/usuarios">Usuarios</a>
-
-    <div class="side-section">Gestión</div>
-    <a class="side-link" href="/repositorios">Repositorios / tags</a>
-    <a class="side-link" href="/auditoria">Auditoría</a>
-
-    <div class="side-section">Usuario</div>
-    <a class="side-link" href="/logout">Cerrar sesión</a>
-</aside>
+{% include "_sidebar.html" %}
 
 <section class="main-panel">
 <header class="topbar">

@@ -8,6 +8,7 @@ import uuid
 import os
 import zipfile
 import json
+import unicodedata
 from datetime import datetime
 from services.orthanc_service import subir_dicom_a_orthanc
 
@@ -1063,7 +1064,7 @@ def exportar_procedimiento_zip(
     export_dir.mkdir(parents=True, exist_ok=True)
 
     timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-    zip_path = export_dir / f"caso_{procedimiento_id}_{timestamp}.zip"
+    zip_path = _angio_041_zip_path(export_dir, procedimiento)
 
     case_data = {
         "schema_version": "1.0.0",
@@ -1559,4 +1560,935 @@ def reintentar_orthanc_procedimiento_v2(
     db.commit()
 
     return RedirectResponse(url=f"/procedimientos/{procedimiento_id}", status_code=303)
+
+
+# ============================================================
+# ANGIO-038: importar ZIP exportado por NeuroPACS
+# ============================================================
+
+@router.get("/importar-caso")
+def importar_caso_get(request: Request):
+    return templates.TemplateResponse(
+        request=request,
+        name="importar_caso.html",
+        context={}
+    )
+
+
+@router.post("/importar-caso")
+async def importar_caso_post(
+    request: Request,
+    archivo: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    nombre_zip = _angio_nombre_seguro(archivo.filename)
+    data = await archivo.read()
+
+    if not data:
+        raise HTTPException(status_code=400, detail="ZIP vacío o no recibido")
+
+    imports_dir = Path(DATA_PATH) / "imports"
+    imports_dir.mkdir(parents=True, exist_ok=True)
+
+    ruta_zip = imports_dir / f"{uuid.uuid4().hex}_{nombre_zip}"
+
+    with open(ruta_zip, "wb") as f:
+        f.write(data)
+
+    try:
+        with zipfile.ZipFile(ruta_zip, "r") as z:
+            nombres_zip = set(z.namelist())
+
+            if "case.json" not in nombres_zip:
+                raise HTTPException(
+                    status_code=400,
+                    detail="El ZIP no contiene case.json. No parece ser una exportación NeuroPACS válida."
+                )
+
+            case_data = json.loads(z.read("case.json").decode("utf-8"))
+            case = case_data.get("case") or {}
+
+            edad_raw = case.get("edad")
+            edad_int = int(edad_raw) if edad_raw is not None and str(edad_raw).isdigit() else None
+
+            nota_importacion = f"Importado desde ZIP NeuroPACS: {nombre_zip}"
+            notas_previas = case.get("notas_adicionales") or ""
+            notas_finales = notas_previas.strip()
+
+            if notas_finales:
+                notas_finales += "\n\n"
+
+            notas_finales += nota_importacion
+
+            procedimiento = Procedimiento(
+                paciente_nombre=case.get("paciente_nombre"),
+                paciente_apellido=case.get("paciente_apellido"),
+                paciente_sexo=case.get("paciente_sexo"),
+                paciente_fecha_nacimiento=parse_date_or_none(case.get("paciente_fecha_nacimiento")),
+                paciente_id=case.get("paciente_id"),
+                paciente_mail=case.get("paciente_mail"),
+                paciente_telefono=case.get("paciente_telefono"),
+                estado_caso=case.get("estado_caso") or "abierto",
+                edad=edad_int,
+                historia_clinica=case.get("historia_clinica"),
+                lugar=case.get("lugar"),
+                institucion=case.get("institucion"),
+                fecha=parse_date_or_none(case.get("fecha")),
+                procedimiento=case.get("procedimiento"),
+                diagnostico=case.get("diagnostico"),
+                presentacion_clinica=case.get("presentacion_clinica"),
+                informe_procedimiento=case.get("informe_procedimiento"),
+                complicaciones=case.get("complicaciones"),
+                notas_adicionales=notas_finales,
+            )
+
+            db.add(procedimiento)
+            db.flush()
+
+            asegurar_tag(db, "institucion", procedimiento.institucion)
+            asegurar_tag(db, "procedimiento", procedimiento.procedimiento)
+
+            for item in case_data.get("participants", []):
+                nombre = (item.get("nombre") or "").strip()
+                rol = (item.get("rol") or "").strip()
+
+                if not nombre or not rol:
+                    continue
+
+                db.add(
+                    ParticipanteProcedimiento(
+                        procedimiento_id=procedimiento.id,
+                        nombre=nombre,
+                        rol=rol,
+                        notas=item.get("notas"),
+                    )
+                )
+
+                asegurar_tag(db, "persona", nombre)
+                asegurar_tag(db, "rol_procedimiento", rol)
+
+            for item in case_data.get("materials", []):
+                nombre = (item.get("nombre") or "").strip()
+
+                if not nombre:
+                    continue
+
+                cantidad_raw = item.get("cantidad")
+                cantidad_int = int(cantidad_raw) if cantidad_raw is not None and str(cantidad_raw).isdigit() else 1
+
+                db.add(
+                    MaterialProcedimiento(
+                        procedimiento_id=procedimiento.id,
+                        nombre=nombre,
+                        tipo_material=item.get("tipo_material"),
+                        cantidad=cantidad_int,
+                        notas=item.get("notas"),
+                    )
+                )
+
+                asegurar_tag(db, "material", nombre)
+                asegurar_tag(db, "tipo_material", item.get("tipo_material"))
+
+            for item in case_data.get("dicom_studies", []):
+                uid = item.get("study_instance_uid")
+
+                if not uid:
+                    continue
+
+                existente = (
+                    db.query(EstudioDICOM)
+                    .filter(EstudioDICOM.study_instance_uid == uid)
+                    .first()
+                )
+
+                if existente:
+                    if existente.procedimiento_id is None:
+                        existente.procedimiento_id = procedimiento.id
+                        existente.estado = "asociado"
+                    continue
+
+                db.add(
+                    EstudioDICOM(
+                        procedimiento_id=procedimiento.id,
+                        study_instance_uid=uid,
+                        orthanc_study_id=item.get("orthanc_study_id"),
+                        patient_name=item.get("patient_name"),
+                        patient_id=item.get("patient_id"),
+                        accession_number=item.get("accession_number"),
+                        study_date=item.get("study_date"),
+                        modality=item.get("modality"),
+                        rol_en_caso=item.get("rol_en_caso"),
+                        estado=item.get("estado") or "asociado",
+                    )
+                )
+
+                if item.get("orthanc_study_id"):
+                    procedimiento.dicom_orthanc_id = item.get("orthanc_study_id")
+
+                procedimiento.study_instance_uid = uid
+
+            destino_dir = Path(DATA_PATH) / "web" / str(procedimiento.id)
+            destino_dir.mkdir(parents=True, exist_ok=True)
+
+            for item in case_data.get("files", []):
+                rel = item.get("ruta_relativa_export")
+
+                if not rel:
+                    continue
+
+                rel_path = Path(rel)
+
+                if rel_path.is_absolute() or ".." in rel_path.parts:
+                    continue
+
+                rel_zip = str(rel_path).replace("\\", "/")
+
+                if rel_zip not in nombres_zip:
+                    continue
+
+                nombre_original = _angio_nombre_seguro(item.get("nombre_original") or rel_path.name)
+                destino = destino_dir / f"{uuid.uuid4().hex}_{nombre_original}"
+
+                with z.open(rel_zip) as src, open(destino, "wb") as dst:
+                    shutil.copyfileobj(src, dst)
+
+                db.add(
+                    Archivo(
+                        procedimiento_id=procedimiento.id,
+                        tipo=item.get("tipo") or _angio_tipo_por_nombre(nombre_original),
+                        categoria=item.get("categoria"),
+                        caption=item.get("caption"),
+                        origen="import_zip_neuropacs",
+                        ruta=str(destino),
+                        nombre_original=nombre_original,
+                        estado="asociado",
+                    )
+                )
+
+            db.commit()
+
+            return RedirectResponse(
+                url=f"/procedimientos/{procedimiento.id}",
+                status_code=303
+            )
+
+    except zipfile.BadZipFile:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="ZIP inválido o corrupto")
+
+    except HTTPException:
+        db.rollback()
+        raise
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error importando ZIP NeuroPACS: {str(e)}")
+
+
+# ============================================================
+# ANGIO-039: exportar DICOM físicos del caso en ZIP separado
+# ============================================================
+
+def _angio_039_nombre_zip_seguro(valor: str | None) -> str:
+    valor = str(valor or "sin_nombre")
+    limpio = []
+    for c in valor:
+        if c.isalnum() or c in ["-", "_", "."]:
+            limpio.append(c)
+        else:
+            limpio.append("_")
+    return "".join(limpio).strip("_") or "sin_nombre"
+
+
+@router.get("/procedimientos/{procedimiento_id}/exportar-dicom")
+def exportar_procedimiento_dicom_zip(
+    procedimiento_id: int,
+    db: Session = Depends(get_db),
+):
+    procedimiento = db.query(Procedimiento).filter(Procedimiento.id == procedimiento_id).first()
+
+    if not procedimiento:
+        raise HTTPException(status_code=404, detail="Procedimiento no encontrado")
+
+    archivos = (
+        db.query(Archivo)
+        .filter(Archivo.procedimiento_id == procedimiento_id)
+        .order_by(Archivo.id.asc())
+        .all()
+    )
+
+    estudios_dicom = (
+        db.query(EstudioDICOM)
+        .filter(EstudioDICOM.procedimiento_id == procedimiento_id)
+        .order_by(EstudioDICOM.id.asc())
+        .all()
+    )
+
+    candidatos = []
+
+    for archivo in archivos:
+        nombre = f"{archivo.nombre_original or ''} {archivo.ruta or ''}".lower()
+
+        if (
+            (archivo.tipo or "").lower() == "dicom"
+            or ".dcm" in nombre
+            or ".dicom" in nombre
+            or ".ima" in nombre
+        ):
+            candidatos.append(archivo)
+
+    if not candidatos:
+        raise HTTPException(
+            status_code=404,
+            detail="Este caso no tiene archivos DICOM físicos asociados para exportar"
+        )
+
+    export_dir = Path(DATA_PATH) / "exports"
+    export_dir.mkdir(parents=True, exist_ok=True)
+
+    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    zip_path = _angio_041_zip_path(export_dir, procedimiento)
+
+    exportados = []
+    faltantes = []
+    usados = set()
+
+    with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_STORED) as zipf:
+        for archivo in candidatos:
+            ruta = Path(archivo.ruta)
+
+            if not ruta.exists() or not ruta.is_file():
+                faltantes.append({
+                    "archivo_id": archivo.id,
+                    "ruta": archivo.ruta,
+                    "nombre_original": archivo.nombre_original,
+                    "estado": archivo.estado,
+                    "motivo": "archivo_no_existe_en_disco",
+                })
+                continue
+
+            study_uid = _angio_039_nombre_zip_seguro(archivo.study_instance_uid or "sin_study_uid")
+            nombre_original = _angio_nombre_seguro(archivo.nombre_original or ruta.name)
+            arcname_base = f"dicom/{study_uid}/{archivo.id}_{nombre_original}"
+
+            arcname = arcname_base
+            contador = 2
+            while arcname in usados:
+                arcname = f"dicom/{study_uid}/{archivo.id}_{contador}_{nombre_original}"
+                contador += 1
+
+            usados.add(arcname)
+            zipf.write(ruta, arcname)
+
+            exportados.append({
+                "archivo_id": archivo.id,
+                "nombre_original": archivo.nombre_original,
+                "ruta_zip": arcname,
+                "study_instance_uid": archivo.study_instance_uid,
+                "orthanc_study_id": archivo.orthanc_study_id,
+                "estado": archivo.estado,
+            })
+
+        manifest = {
+            "schema_version": "1.0.0",
+            "app_version": "0.1.0",
+            "exported_at": datetime.utcnow().isoformat(),
+            "case_id": procedimiento.id,
+            "export_type": "dicom_physical_files",
+            "contains_dicom_files": True,
+            "dicom_files_exported_count": len(exportados),
+            "dicom_files_missing_count": len(faltantes),
+            "dicom_files_candidates_count": len(candidatos),
+            "dicom_studies": [
+                {
+                    "id": e.id,
+                    "study_instance_uid": e.study_instance_uid,
+                    "orthanc_study_id": e.orthanc_study_id,
+                    "patient_name": e.patient_name,
+                    "patient_id": e.patient_id,
+                    "accession_number": e.accession_number,
+                    "study_date": e.study_date,
+                    "modality": e.modality,
+                    "rol_en_caso": e.rol_en_caso,
+                    "estado": e.estado,
+                }
+                for e in estudios_dicom
+            ],
+            "exported_files": exportados,
+            "missing_files": faltantes,
+        }
+
+        zipf.writestr(
+            "manifest_dicom.json",
+            json.dumps(manifest, ensure_ascii=False, indent=2)
+        )
+
+    if not exportados:
+        try:
+            zip_path.unlink()
+        except Exception:
+            pass
+
+        raise HTTPException(
+            status_code=404,
+            detail="Se encontraron registros DICOM, pero ningún archivo físico existe en disco"
+        )
+
+    return FileResponse(
+        path=zip_path,
+        filename=zip_path.name,
+        media_type="application/zip"
+    )
+
+
+# ============================================================
+# ANGIO-040: exportar caso completo con DICOM físico
+# ============================================================
+
+def _angio_040_nombre_seguro_zip(valor: str | None) -> str:
+    valor = str(valor or "sin_nombre")
+    limpio = []
+
+    for c in valor:
+        if c.isalnum() or c in ["-", "_", "."]:
+            limpio.append(c)
+        else:
+            limpio.append("_")
+
+    return "".join(limpio).strip("_") or "sin_nombre"
+
+
+@router.get("/procedimientos/{procedimiento_id}/exportar-completo")
+def exportar_procedimiento_completo_zip(
+    procedimiento_id: int,
+    db: Session = Depends(get_db),
+):
+    procedimiento = db.query(Procedimiento).filter(Procedimiento.id == procedimiento_id).first()
+
+    if not procedimiento:
+        raise HTTPException(status_code=404, detail="Procedimiento no encontrado")
+
+    archivos = (
+        db.query(Archivo)
+        .filter(Archivo.procedimiento_id == procedimiento_id)
+        .order_by(Archivo.id.asc())
+        .all()
+    )
+
+    participantes = (
+        db.query(ParticipanteProcedimiento)
+        .filter(ParticipanteProcedimiento.procedimiento_id == procedimiento_id)
+        .order_by(ParticipanteProcedimiento.id.asc())
+        .all()
+    )
+
+    materiales = (
+        db.query(MaterialProcedimiento)
+        .filter(MaterialProcedimiento.procedimiento_id == procedimiento_id)
+        .order_by(MaterialProcedimiento.id.asc())
+        .all()
+    )
+
+    estudios_dicom = (
+        db.query(EstudioDICOM)
+        .filter(EstudioDICOM.procedimiento_id == procedimiento_id)
+        .order_by(EstudioDICOM.id.asc())
+        .all()
+    )
+
+    export_dir = Path(DATA_PATH) / "exports"
+    export_dir.mkdir(parents=True, exist_ok=True)
+
+    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    zip_path = _angio_041_zip_path(export_dir, procedimiento)
+
+    archivos_exportados = []
+    archivos_faltantes = []
+    archivos_excluidos = []
+    usados = set()
+
+    case_data = {
+        "schema_version": "1.0.0",
+        "app_version": "0.1.0",
+        "export_type": "complete_with_dicom",
+        "exported_at": datetime.utcnow().isoformat(),
+        "case": {
+            "id": procedimiento.id,
+            "paciente_nombre": procedimiento.paciente_nombre,
+            "paciente_apellido": getattr(procedimiento, "paciente_apellido", None),
+            "paciente_sexo": getattr(procedimiento, "paciente_sexo", None),
+            "paciente_fecha_nacimiento": str(procedimiento.paciente_fecha_nacimiento) if getattr(procedimiento, "paciente_fecha_nacimiento", None) else None,
+            "paciente_id": getattr(procedimiento, "paciente_id", None),
+            "paciente_mail": getattr(procedimiento, "paciente_mail", None),
+            "paciente_telefono": getattr(procedimiento, "paciente_telefono", None),
+            "estado_caso": getattr(procedimiento, "estado_caso", None),
+            "edad": procedimiento.edad,
+            "historia_clinica": procedimiento.historia_clinica,
+            "lugar": procedimiento.lugar,
+            "institucion": getattr(procedimiento, "institucion", None),
+            "fecha": str(procedimiento.fecha) if procedimiento.fecha else None,
+            "procedimiento": procedimiento.procedimiento,
+            "diagnostico": procedimiento.diagnostico,
+            "presentacion_clinica": procedimiento.presentacion_clinica,
+            "localizacion_aneurisma": procedimiento.localizacion_aneurisma,
+            "vaina": procedimiento.vaina,
+            "cateter": procedimiento.cateter,
+            "cateter_intermedio": procedimiento.cateter_intermedio,
+            "microcateter": procedimiento.microcateter,
+            "guia": procedimiento.guia,
+            "microguia": procedimiento.microguia,
+            "fd": procedimiento.fd,
+            "materiales_usados": procedimiento.materiales_usados,
+            "informe_procedimiento": getattr(procedimiento, "informe_procedimiento", None),
+            "complicaciones_si_no": procedimiento.complicaciones_si_no,
+            "complicaciones": procedimiento.complicaciones,
+            "notas_adicionales": procedimiento.notas_adicionales,
+        },
+        "participants": [
+            {
+                "id": p.id,
+                "nombre": p.nombre,
+                "rol": p.rol,
+                "notas": p.notas,
+            }
+            for p in participantes
+        ],
+        "materials": [
+            {
+                "id": m.id,
+                "nombre": m.nombre,
+                "tipo_material": m.tipo_material,
+                "cantidad": m.cantidad,
+                "notas": m.notas,
+            }
+            for m in materiales
+        ],
+        "dicom_studies": [
+            {
+                "id": e.id,
+                "study_instance_uid": e.study_instance_uid,
+                "orthanc_study_id": e.orthanc_study_id,
+                "patient_name": e.patient_name,
+                "patient_id": e.patient_id,
+                "accession_number": e.accession_number,
+                "study_date": e.study_date,
+                "modality": e.modality,
+                "rol_en_caso": e.rol_en_caso,
+                "estado": e.estado,
+            }
+            for e in estudios_dicom
+        ],
+    }
+
+    md_lines = []
+    md_lines.append(f"# Caso {procedimiento.id}")
+    md_lines.append("")
+    md_lines.append(f"- Paciente: {procedimiento.paciente_nombre or ''} {getattr(procedimiento, 'paciente_apellido', '') or ''}".strip())
+    md_lines.append(f"- Historia clínica: {procedimiento.historia_clinica or ''}")
+    md_lines.append(f"- Fecha: {procedimiento.fecha or ''}")
+    md_lines.append(f"- Institución: {getattr(procedimiento, 'institucion', '') or procedimiento.lugar or ''}")
+    md_lines.append(f"- Procedimiento: {procedimiento.procedimiento or ''}")
+    md_lines.append("")
+    md_lines.append("## Diagnóstico")
+    md_lines.append(procedimiento.diagnostico or "")
+    md_lines.append("")
+    md_lines.append("## Presentación clínica")
+    md_lines.append(procedimiento.presentacion_clinica or "")
+    md_lines.append("")
+    md_lines.append("## Participantes")
+    for p in participantes:
+        md_lines.append(f"- {p.nombre} ({p.rol}) {p.notas or ''}")
+    md_lines.append("")
+    md_lines.append("## Materiales")
+    for m in materiales:
+        md_lines.append(f"- {m.nombre} | {m.tipo_material or ''} | cantidad: {m.cantidad or 1} | {m.notas or ''}")
+    md_lines.append("")
+    md_lines.append("## Estudios DICOM")
+    for e in estudios_dicom:
+        md_lines.append(f"- StudyInstanceUID: {e.study_instance_uid} | Orthanc: {e.orthanc_study_id or ''} | Rol: {e.rol_en_caso or ''}")
+
+    with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_STORED) as zipf:
+        zipf.writestr("case.json", json.dumps(case_data, ensure_ascii=False, indent=2))
+        zipf.writestr("case.md", "\n".join(md_lines))
+
+        for archivo in archivos:
+            ruta = Path(archivo.ruta)
+            tipo = (archivo.tipo or "").lower()
+            nombre_completo = f"{archivo.nombre_original or ''} {archivo.ruta or ''}".lower()
+
+            es_dicom = (
+                tipo == "dicom"
+                or ".dcm" in nombre_completo
+                or ".dicom" in nombre_completo
+                or ".ima" in nombre_completo
+            )
+
+            es_zip_original = tipo == "zip"
+
+            if es_zip_original:
+                archivos_excluidos.append({
+                    "archivo_id": archivo.id,
+                    "tipo": archivo.tipo,
+                    "nombre_original": archivo.nombre_original,
+                    "motivo": "zip_original_excluido_para_evitar_duplicacion",
+                    "estado": archivo.estado,
+                })
+                continue
+
+            if not ruta.exists() or not ruta.is_file():
+                archivos_faltantes.append({
+                    "archivo_id": archivo.id,
+                    "tipo": archivo.tipo,
+                    "ruta": archivo.ruta,
+                    "nombre_original": archivo.nombre_original,
+                    "estado": archivo.estado,
+                    "motivo": "archivo_no_existe_en_disco",
+                })
+                continue
+
+            nombre_original = _angio_nombre_seguro(archivo.nombre_original or ruta.name)
+
+            if es_dicom:
+                study_uid = _angio_040_nombre_seguro_zip(archivo.study_instance_uid or "sin_study_uid")
+                arcname_base = f"dicom/{study_uid}/{archivo.id}_{nombre_original}"
+            else:
+                arcname_base = f"files/{archivo.id}_{nombre_original}"
+
+            arcname = arcname_base
+            contador = 2
+
+            while arcname in usados:
+                if es_dicom:
+                    study_uid = _angio_040_nombre_seguro_zip(archivo.study_instance_uid or "sin_study_uid")
+                    arcname = f"dicom/{study_uid}/{archivo.id}_{contador}_{nombre_original}"
+                else:
+                    arcname = f"files/{archivo.id}_{contador}_{nombre_original}"
+                contador += 1
+
+            usados.add(arcname)
+            zipf.write(ruta, arcname)
+
+            archivos_exportados.append({
+                "archivo_id": archivo.id,
+                "tipo": archivo.tipo,
+                "nombre_original": archivo.nombre_original,
+                "ruta_zip": arcname,
+                "es_dicom": es_dicom,
+                "study_instance_uid": archivo.study_instance_uid,
+                "orthanc_study_id": archivo.orthanc_study_id,
+                "estado": archivo.estado,
+            })
+
+        manifest = {
+            "schema_version": "1.0.0",
+            "app_version": "0.1.0",
+            "exported_at": datetime.utcnow().isoformat(),
+            "case_id": procedimiento.id,
+            "export_type": "complete_with_dicom",
+            "contains_dicom_files": True,
+            "exported_files_count": len(archivos_exportados),
+            "missing_files_count": len(archivos_faltantes),
+            "excluded_files_count": len(archivos_excluidos),
+            "exported_files": archivos_exportados,
+            "missing_files": archivos_faltantes,
+            "excluded_files": archivos_excluidos,
+        }
+
+        zipf.writestr("manifest_complete.json", json.dumps(manifest, ensure_ascii=False, indent=2))
+
+    return FileResponse(
+        path=zip_path,
+        filename=zip_path.name,
+        media_type="application/zip"
+    )
+
+
+# ============================================================
+# ANGIO-041: nombre estándar de exportación ZIP
+# Formato: NeuroPACS_ApellidoNombre_AAMMDDHHMM.zip
+# ============================================================
+
+def _angio_041_slug_ascii(valor: str | None) -> str:
+    valor = str(valor or "").strip()
+
+    if not valor:
+        return ""
+
+    valor = unicodedata.normalize("NFKD", valor)
+    valor = "".join(c for c in valor if not unicodedata.combining(c))
+
+    limpio = []
+    for c in valor:
+        if c.isalnum():
+            limpio.append(c)
+        elif c in [" ", "-", "_", "."]:
+            limpio.append("_")
+
+    salida = "".join(limpio)
+    salida = re.sub(r"_+", "_", salida).strip("_")
+
+    return salida
+
+
+def _angio_041_nombre_paciente_export(procedimiento: Procedimiento) -> str:
+    apellido = _angio_041_slug_ascii(getattr(procedimiento, "paciente_apellido", None))
+    nombre = _angio_041_slug_ascii(getattr(procedimiento, "paciente_nombre", None))
+
+    combinado = f"{apellido}{nombre}".strip("_")
+
+    if combinado:
+        return combinado
+
+    return f"Caso{procedimiento.id}"
+
+
+def _angio_041_zip_path(export_dir: Path, procedimiento: Procedimiento) -> Path:
+    paciente = _angio_041_nombre_paciente_export(procedimiento)
+    timestamp = datetime.now().strftime("%y%m%d%H%M")
+    base = f"NeuroPACS_{paciente}_{timestamp}"
+    path = export_dir / f"{base}.zip"
+
+    # Evita sobreescritura si se exporta más de una vez en el mismo minuto.
+    if not path.exists():
+        return path
+
+    contador = 2
+    while True:
+        candidato = export_dir / f"{base}_{contador}.zip"
+        if not candidato.exists():
+            return candidato
+        contador += 1
+
+
+# ============================================================
+# ANGIO-042: helper definitivo nombre ZIP
+# Formato: NeuroPACS_aa_apellidonombre_AAMMDDHHMM.zip
+# aa = año del procedimiento
+# ============================================================
+
+def _angio_041_slug_ascii(valor: str | None) -> str:
+    import unicodedata as _unicodedata
+
+    valor = str(valor or "").strip().lower()
+
+    if not valor:
+        return ""
+
+    valor = _unicodedata.normalize("NFKD", valor)
+    valor = "".join(c for c in valor if not _unicodedata.combining(c))
+
+    limpio = []
+
+    for c in valor:
+        if c.isalnum():
+            limpio.append(c)
+        elif c in [" ", "-", "_", "."]:
+            limpio.append("_")
+
+    salida = "".join(limpio)
+
+    while "__" in salida:
+        salida = salida.replace("__", "_")
+
+    return salida.strip("_")
+
+
+def _angio_042_anio_procedimiento(procedimiento: Procedimiento) -> str:
+    fecha = getattr(procedimiento, "fecha", None)
+
+    if fecha:
+        texto = str(fecha)
+        if len(texto) >= 4 and texto[:4].isdigit():
+            return texto[:4][-2:]
+
+    return datetime.now().strftime("%y")
+
+
+def _angio_041_nombre_paciente_export(procedimiento: Procedimiento) -> str:
+    apellido = _angio_041_slug_ascii(getattr(procedimiento, "paciente_apellido", None))
+    nombre = _angio_041_slug_ascii(getattr(procedimiento, "paciente_nombre", None))
+
+    combinado = f"{apellido}{nombre}".strip("_")
+
+    if combinado:
+        return combinado
+
+    return f"caso{procedimiento.id}"
+
+
+def _angio_041_zip_path(export_dir: Path, procedimiento: Procedimiento) -> Path:
+    anio_proc = _angio_042_anio_procedimiento(procedimiento)
+    paciente = _angio_041_nombre_paciente_export(procedimiento)
+    timestamp = datetime.now().strftime("%y%m%d%H%M")
+
+    base = f"NeuroPACS_{anio_proc}_{paciente}_{timestamp}"
+    path = export_dir / f"{base}.zip"
+
+    if not path.exists():
+        return path
+
+    contador = 2
+
+    while True:
+        candidato = export_dir / f"{base}_{contador}.zip"
+        if not candidato.exists():
+            return candidato
+        contador += 1
+
+
+# ============================================================
+# ANGIO-043: repositorio admin para borrar casos y archivos
+# ============================================================
+
+def _angio_043_admin_required(request: Request):
+    if request.session.get("rol") != "admin":
+        raise HTTPException(status_code=403, detail="Solo administradores pueden realizar esta acción")
+
+
+def _angio_043_unlink_archivo_seguro(ruta_str: str | None):
+    if not ruta_str:
+        return False
+
+    try:
+        ruta = Path(ruta_str)
+
+        if ruta.exists() and ruta.is_file():
+            ruta.unlink()
+            return True
+
+    except Exception:
+        return False
+
+    return False
+
+
+@router.get("/admin/casos-borrar")
+def admin_casos_borrar_get(
+    request: Request,
+    buscar: str = "",
+    db: Session = Depends(get_db),
+):
+    _angio_043_admin_required(request)
+
+    query = db.query(Procedimiento)
+
+    if buscar:
+        filtro = f"%{buscar}%"
+        query = query.filter(
+            (Procedimiento.paciente_nombre.ilike(filtro)) |
+            (Procedimiento.paciente_apellido.ilike(filtro)) |
+            (Procedimiento.historia_clinica.ilike(filtro)) |
+            (Procedimiento.institucion.ilike(filtro)) |
+            (Procedimiento.lugar.ilike(filtro)) |
+            (Procedimiento.procedimiento.ilike(filtro))
+        )
+
+    procedimientos = query.order_by(Procedimiento.id.desc()).limit(300).all()
+
+    filas = []
+
+    for p in procedimientos:
+        archivos_count = db.query(Archivo).filter(Archivo.procedimiento_id == p.id).count()
+        dicom_count = db.query(EstudioDICOM).filter(EstudioDICOM.procedimiento_id == p.id).count()
+        participantes_count = db.query(ParticipanteProcedimiento).filter(ParticipanteProcedimiento.procedimiento_id == p.id).count()
+        materiales_count = db.query(MaterialProcedimiento).filter(MaterialProcedimiento.procedimiento_id == p.id).count()
+
+        filas.append({
+            "p": p,
+            "archivos_count": archivos_count,
+            "dicom_count": dicom_count,
+            "participantes_count": participantes_count,
+            "materiales_count": materiales_count,
+        })
+
+    return templates.TemplateResponse(
+        request=request,
+        name="admin_casos_borrar.html",
+        context={
+            "filas": filas,
+            "buscar": buscar,
+        }
+    )
+
+
+@router.post("/admin/casos-borrar/{procedimiento_id}")
+def admin_casos_borrar_post(
+    procedimiento_id: int,
+    request: Request,
+    confirmar: str = Form(""),
+    borrar_archivos: str = Form("si"),
+    db: Session = Depends(get_db),
+):
+    _angio_043_admin_required(request)
+
+    if confirmar != "BORRAR":
+        raise HTTPException(status_code=400, detail="Confirmación inválida. Debes escribir BORRAR.")
+
+    procedimiento = db.query(Procedimiento).filter(Procedimiento.id == procedimiento_id).first()
+
+    if not procedimiento:
+        raise HTTPException(status_code=404, detail="Caso no encontrado")
+
+    archivos = db.query(Archivo).filter(Archivo.procedimiento_id == procedimiento_id).all()
+
+    archivos_borrados = 0
+    archivos_faltantes = 0
+
+    if borrar_archivos == "si":
+        for archivo in archivos:
+            ok = _angio_043_unlink_archivo_seguro(archivo.ruta)
+            if ok:
+                archivos_borrados += 1
+            else:
+                archivos_faltantes += 1
+
+    # Borrar registros dependientes conocidos.
+    db.query(SugerenciaIA).filter(SugerenciaIA.procedimiento_id == procedimiento_id).delete(synchronize_session=False)
+    db.query(ParticipanteProcedimiento).filter(ParticipanteProcedimiento.procedimiento_id == procedimiento_id).delete(synchronize_session=False)
+    db.query(MaterialProcedimiento).filter(MaterialProcedimiento.procedimiento_id == procedimiento_id).delete(synchronize_session=False)
+    db.query(EstudioDICOM).filter(EstudioDICOM.procedimiento_id == procedimiento_id).delete(synchronize_session=False)
+    db.query(Archivo).filter(Archivo.procedimiento_id == procedimiento_id).delete(synchronize_session=False)
+
+    db.delete(procedimiento)
+    db.commit()
+
+    return RedirectResponse(
+        url=f"/admin/casos-borrar?buscar=",
+        status_code=303
+    )
+
+
+# ============================================================
+# ANGIO-044: galería de imágenes y videos del caso
+# ============================================================
+
+@router.get("/procedimientos/{procedimiento_id}/galeria")
+def galeria_archivos_caso(
+    procedimiento_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    procedimiento = db.query(Procedimiento).filter(Procedimiento.id == procedimiento_id).first()
+
+    if not procedimiento:
+        raise HTTPException(status_code=404, detail="Procedimiento no encontrado")
+
+    archivos = (
+        db.query(Archivo)
+        .filter(
+            Archivo.procedimiento_id == procedimiento_id,
+            Archivo.tipo.in_(["foto", "video"]),
+        )
+        .order_by(Archivo.id.asc())
+        .all()
+    )
+
+    return templates.TemplateResponse(
+        request=request,
+        name="galeria.html",
+        context={
+            "procedimiento": procedimiento,
+            "archivos": archivos,
+        }
+    )
 
