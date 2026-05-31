@@ -56,17 +56,14 @@ app.include_router(pacientes_router)
 app.include_router(usuarios_router)
 app.include_router(orthanc_gateway_router)
 
-@app.middleware("http")
-async def enforce_password_change(request: Request, call_next):
-    """
-    Bloquea navegación si un usuario real de BD tiene clave temporal.
-    Permite login, logout, perfil, estáticos y health.
-    No aplica al bootstrap admin de .env.
-    """
+
+def require_login(request: Request):
+    if request.session.get("auth") is not True:
+        return RedirectResponse(url="/login", status_code=303)
+
     path = request.url.path
 
     rutas_libres = (
-        "/login",
         "/logout",
         "/mi-perfil",
         "/static",
@@ -75,22 +72,14 @@ async def enforce_password_change(request: Request, call_next):
     )
 
     if any(path == r or path.startswith(r + "/") for r in rutas_libres):
-        return await call_next(request)
+        return None
 
     if (
-        request.session.get("auth") is True
-        and request.session.get("bootstrap_admin") is not True
+        request.session.get("bootstrap_admin") is not True
         and request.session.get("must_change_password") is True
     ):
         return RedirectResponse(url="/mi-perfil?forzar_password=1", status_code=303)
 
-    return await call_next(request)
-
-
-
-def require_login(request: Request):
-    if request.session.get("auth") is not True:
-        return RedirectResponse(url="/login", status_code=303)
     return None
 
 
